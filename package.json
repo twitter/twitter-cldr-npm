@@ -1,0 +1,23 @@
+{
+  "name": "twitter-cldr",
+  "description": "Library that uses the Common Locale Data Repository to format dates, plurals, and more.",
+  "homepage": "https://github.com/twitter/twitter-cldr-npm/",
+  "keywords": [
+    "unicode",
+    "localization",
+    "cldr"
+  ],
+  "author": "Cameron Dutro <cdutro@twitter.com>",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/twitter/twitter-cldr-npm.git"
+  },
+  "main": "twitter-cldr.js",
+  "version": "1.0.0",
+  "dependencies": {},
+  "devDependencies": {},
+  "optionalDependencies": {},
+  "engines": {
+    "node": "*"
+  }
+}
