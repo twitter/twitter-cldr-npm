@@ -1,23 +1,24 @@
 {
-  "name": "twitter-cldr",
-  "description": "Library that uses the Common Locale Data Repository to format dates, plurals, and more.",
+  "name": "twitter_cldr",
+  "description": "JavaScript implementation of the ICU (International Components for Unicode) that uses the Common Locale Data Repository to format dates, plurals, and more. Based on twitter-cldr-rb",
   "homepage": "https://github.com/twitter/twitter-cldr-npm/",
   "keywords": [
     "unicode",
     "localization",
-    "cldr"
+    "cldr",
+    "ICU"
   ],
   "contributors": [
     {"name": "Cameron Dutro", "url": "http://twitter.com/camertron", "email": "cdutro@twitter.com"},
-    {"name": "Kirill Lashuk", "url": "http://twitter.com/kl_7"},
-  }
+    {"name": "Kirill Lashuk", "url": "http://twitter.com/kl_7"}
+  ],
   "author": "Cameron Dutro <cdutro@twitter.com> (http://twitter.com/camertron)",
   "repository": {
     "type": "git",
     "url": "git://github.com/twitter/twitter-cldr-npm.git"
   },
-  "main": "twitter-cldr.js",
-  "version": "1.0.0",
+  "main": "twitter_cldr.js",
+  "version": "2.0.0",
   "dependencies": {},
   "devDependencies": {},
   "optionalDependencies": {},
