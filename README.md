@@ -26,6 +26,10 @@ See usage documentation for [twitter-cldr-js](http://github.com/twitter/twitter-
 
 * None.
 
+### Tests
+
+See [twitter-cldr-js](http://github.com/twitter/twitter-cldr-js) for test suite.
+
 ### Authors
 
 * Cameron Dutro: [http://twitter.com/camertron](http://twitter.com/camertron)
