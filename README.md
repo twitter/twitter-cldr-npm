@@ -41,3 +41,9 @@ See [twitter-cldr-js](http://github.com/twitter/twitter-cldr-js) for test suite.
 * [twitter-cldr-js](http://github.com/twitter/twitter-cldr-js) - JavaScript library for Ruby on Rails
 * [CLDR Homepage](http://cldr.unicode.org/) - Where all the data comes from
 * [ICU Homepage](http://site.icu-project.org/) - IBM's C++/Java internationalization library that TwitterCLDR is based on
+
+### License
+
+Copyright 2012 Twitter, Inc.
+
+Licensed under the Apache License, Version 2.0: http://www.apache.org/licenses/LICENSE-2.0
