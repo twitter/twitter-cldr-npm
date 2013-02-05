@@ -1,6 +1,6 @@
 {
   "name": "twitter-cldr-npm",
   "version": "1.0.0",
-  "main": ["twitter_cldr.js"],
+  "main": ["full"],
   "dependencies": {}
 }
