@@ -1,6 +1,1 @@
-{
-  "name": "twitter-cldr-npm",
-  "version": "1.0.0",
-  "main": ["full"],
-  "dependencies": {}
-}
+bower.json
