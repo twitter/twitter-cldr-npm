@@ -33,7 +33,7 @@ See [twitter-cldr-js](http://github.com/twitter/twitter-cldr-js) for test suite.
 ### Authors
 
 * Cameron Dutro: [http://twitter.com/camertron](http://twitter.com/camertron)
-* Kirill Lashuk: [http://twitter.com/kl_7](http://twitter.com/kl_7)
+* Kirill Lashuk: [http://twitter.com/kl7](http://twitter.com/kl7)
 
 ### Links
 
