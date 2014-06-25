@@ -24,6 +24,8 @@
 
   TwitterCldr.is_rtl = false;
 
+  TwitterCldr.locale = "vi";
+
   TwitterCldr.Utilities = (function() {
     function Utilities() {}
 
@@ -571,7 +573,7 @@
     DateTimeFormatter.prototype.timezone = function(time, pattern, length) {
       var hours, minutes, offset, offsetString, sign;
       offset = time.getTimezoneOffset();
-      hours = ("00" + (Math.abs(offset) / 60).toString()).slice(-2);
+      hours = ("00" + (Math.floor(Math.abs(offset) / 60)).toString()).slice(-2);
       minutes = ("00" + (Math.abs(offset) % 60).toString()).slice(-2);
       sign = offset > 0 ? "-" : "+";
       offsetString = sign + hours + ":" + minutes;
@@ -746,7 +748,7 @@
     }
 
     NumberFormatter.prototype.format = function(number, options) {
-      var fraction, fraction_format, integer_format, intg, key, opts, prefix, result, sign, suffix, val, _ref, _ref1;
+      var fraction, fraction_format, integer_format, intg, key, opts, prefix, result, sign, suffix, tokens, val, _ref, _ref1;
       if (options == null) {
         options = {};
       }
@@ -755,18 +757,23 @@
         val = options[key];
         opts[key] = options[key] != null ? options[key] : opts[key];
       }
-      _ref = this.partition_tokens(this.get_tokens(number, opts)), prefix = _ref[0], suffix = _ref[1], integer_format = _ref[2], fraction_format = _ref[3];
-      number = this.transform_number(number);
-      _ref1 = this.parse_number(number, opts), intg = _ref1[0], fraction = _ref1[1];
-      result = integer_format.apply(parseFloat(intg), opts);
-      if (fraction) {
-        result += fraction_format.apply(fraction, opts);
+      tokens = this.get_tokens(number, opts);
+      if (tokens.join('') === '0') {
+        return number.toString();
+      } else {
+        _ref = this.partition_tokens(tokens), prefix = _ref[0], suffix = _ref[1], integer_format = _ref[2], fraction_format = _ref[3];
+        number = this.truncate_number(number, integer_format);
+        _ref1 = this.parse_number(number, opts), intg = _ref1[0], fraction = _ref1[1];
+        result = integer_format.apply(parseFloat(intg), opts);
+        if (fraction) {
+          result += fraction_format.apply(fraction, opts);
+        }
+        sign = number < 0 && prefix !== "-" ? this.symbols.minus_sign || this.default_symbols.minus_sign : "";
+        return "" + prefix + result + suffix;
       }
-      sign = number < 0 && prefix !== "-" ? this.symbols.minus_sign || this.default_symbols.minus_sign : "";
-      return "" + prefix + result + suffix;
     };
 
-    NumberFormatter.prototype.transform_number = function(number) {
+    NumberFormatter.prototype.truncate_number = function(number, integer_format) {
       return number;
     };
 
@@ -1001,12 +1008,11 @@
       return tokens;
     };
 
-    AbbreviatedNumberFormatter.prototype.transform_number = function(number) {
-      var factor, power;
-      if ((number < this.NUMBER_MAX) && (number >= this.NUMBER_MIN)) {
-        power = Math.floor((number.toString().length - 1) / 3) * 3;
-        factor = Math.pow(10, power);
-        return number / factor;
+    AbbreviatedNumberFormatter.prototype.truncate_number = function(number, integer_format) {
+      var factor;
+      if (this.NUMBER_MIN <= number && number < this.NUMBER_MAX) {
+        factor = Math.max(0, Math.floor(number).toString().length - integer_format.format.length);
+        return number / Math.pow(10, factor);
       } else {
         return number;
       }
@@ -1813,20 +1819,93 @@
     };
 
     PhoneCodes.code_for_territory = function(territory) {
-      var phone_code, result, territory_code, _ref;
-      result = null;
-      _ref = this.phone_codes;
-      for (territory_code in _ref) {
-        phone_code = _ref[territory_code];
-        if (territory_code === territory) {
-          result = phone_code;
-          break;
-        }
+      var result;
+      result = this.phone_codes[territory];
+      if (result != null) {
+        return result;
+      } else {
+        return null;
       }
-      return result;
     };
 
     return PhoneCodes;
+
+  })();
+
+  TwitterCldr.PostalCodes = (function() {
+    var find_regex, postal_codes;
+
+    function PostalCodes() {}
+
+    postal_codes = {"ad":"AD\\d{3}","am":"(37)?\\d{4}","ar":"([A-HJ-NP-Z])?\\d{4}([A-Z]{3})?","as":"96799","at":"\\d{4}","au":"\\d{4}","ax":"22\\d{3}","az":"\\d{4}","ba":"\\d{5}","bb":"(BB\\d{5})?","bd":"\\d{4}","be":"\\d{4}","bg":"\\d{4}","bh":"((1[0-2]|[2-9])\\d{2})?","bm":"[A-Z]{2}[ ]?[A-Z0-9]{2}","bn":"[A-Z]{2}[ ]?\\d{4}","br":"\\d{5}[\\-]?\\d{3}","by":"\\d{6}","ca":"[ABCEGHJKLMNPRSTVXY]\\d[ABCEGHJ-NPRSTV-Z][ ]?\\d[ABCEGHJ-NPRSTV-Z]\\d","cc":"6799","ch":"\\d{4}","ck":"\\d{4}","cl":"\\d{7}","cn":"\\d{6}","cr":"\\d{4,5}|\\d{3}-\\d{4}","cs":"\\d{5}","cv":"\\d{4}","cx":"6798","cy":"\\d{4}","cz":"\\d{3}[ ]?\\d{2}","de":"\\d{5}","dk":"\\d{4}","do":"\\d{5}","dz":"\\d{5}","ec":"([A-Z]\\d{4}[A-Z]|(?:[A-Z]{2})?\\d{6})?","ee":"\\d{5}","eg":"\\d{5}","es":"\\d{5}","et":"\\d{4}","fi":"\\d{5}","fk":"FIQQ 1ZZ","fm":"(9694[1-4])([ \\-]\\d{4})?","fo":"\\d{3}","fr":"\\d{2}[ ]?\\d{3}","gb":"GIR[ ]?0AA|((AB|AL|B|BA|BB|BD|BH|BL|BN|BR|BS|BT|CA|CB|CF|CH|CM|CO|CR|CT|CV|CW|DA|DD|DE|DG|DH|DL|DN|DT|DY|E|EC|EH|EN|EX|FK|FY|G|GL|GY|GU|HA|HD|HG|HP|HR|HS|HU|HX|IG|IM|IP|IV|JE|KA|KT|KW|KY|L|LA|LD|LE|LL|LN|LS|LU|M|ME|MK|ML|N|NE|NG|NN|NP|NR|NW|OL|OX|PA|PE|PH|PL|PO|PR|RG|RH|RM|S|SA|SE|SG|SK|SL|SM|SN|SO|SP|SR|SS|ST|SW|SY|TA|TD|TF|TN|TQ|TR|TS|TW|UB|W|WA|WC|WD|WF|WN|WR|WS|WV|YO|ZE)(\\d[\\dA-Z]?[ ]?\\d[ABD-HJLN-UW-Z]{2}))|BFPO[ ]?\\d{1,4}","ge":"\\d{4}","gf":"9[78]3\\d{2}","gg":"GY\\d[\\dA-Z]?[ ]?\\d[ABD-HJLN-UW-Z]{2}","gl":"39\\d{2}","gn":"\\d{3}","gp":"9[78][01]\\d{2}","gr":"\\d{3}[ ]?\\d{2}","gs":"SIQQ 1ZZ","gt":"\\d{5}","gu":"969[123]\\d([ \\-]\\d{4})?","gw":"\\d{4}","hm":"\\d{4}","hn":"(?:\\d{5})?","hr":"\\d{5}","ht":"\\d{4}","hu":"\\d{4}","id":"\\d{5}","ie":"((D|DUBLIN)?([1-9]|6[wW]|1[0-8]|2[024]))?","il":"\\d{5}","im":"IM\\d[\\dA-Z]?[ ]?\\d[ABD-HJLN-UW-Z]{2}","in":"\\d{6}","io":"BBND 1ZZ","iq":"\\d{5}","is":"\\d{3}","it":"\\d{5}","je":"JE\\d[\\dA-Z]?[ ]?\\d[ABD-HJLN-UW-Z]{2}","jo":"\\d{5}","jp":"\\d{3}-\\d{4}","ke":"\\d{5}","kg":"\\d{6}","kh":"\\d{5}","kr":"\\d{3}[\\-]\\d{3}","kw":"\\d{5}","kz":"\\d{6}","la":"\\d{5}","lb":"(\\d{4}([ ]?\\d{4})?)?","li":"(948[5-9])|(949[0-7])","lk":"\\d{5}","lr":"\\d{4}","ls":"\\d{3}","lt":"\\d{5}","lu":"\\d{4}","lv":"\\d{4}","ma":"\\d{5}","mc":"980\\d{2}","md":"\\d{4}","me":"8\\d{4}","mg":"\\d{3}","mh":"969[67]\\d([ \\-]\\d{4})?","mk":"\\d{4}","mn":"\\d{6}","mp":"9695[012]([ \\-]\\d{4})?","mq":"9[78]2\\d{2}","mt":"[A-Z]{3}[ ]?\\d{2,4}","mu":"(\\d{3}[A-Z]{2}\\d{3})?","mv":"\\d{5}","mx":"\\d{5}","my":"\\d{5}","nc":"988\\d{2}","ne":"\\d{4}","nf":"2899","ng":"(\\d{6})?","ni":"((\\d{4}-)?\\d{3}-\\d{3}(-\\d{1})?)?","nl":"\\d{4}[ ]?[A-Z]{2}","no":"\\d{4}","np":"\\d{5}","nz":"\\d{4}","om":"(PC )?\\d{3}","pf":"987\\d{2}","pg":"\\d{3}","ph":"\\d{4}","pk":"\\d{5}","pl":"\\d{2}-\\d{3}","pm":"9[78]5\\d{2}","pn":"PCRN 1ZZ","pr":"00[679]\\d{2}([ \\-]\\d{4})?","pt":"\\d{4}([\\-]\\d{3})?","pw":"96940","py":"\\d{4}","re":"9[78]4\\d{2}","ro":"\\d{6}","rs":"\\d{6}","ru":"\\d{6}","sa":"\\d{5}","se":"\\d{3}[ ]?\\d{2}","sg":"\\d{6}","sh":"(ASCN|STHL) 1ZZ","si":"\\d{4}","sj":"\\d{4}","sk":"\\d{3}[ ]?\\d{2}","sm":"4789\\d","sn":"\\d{5}","so":"\\d{5}","sz":"[HLMS]\\d{3}","tc":"TKCA 1ZZ","th":"\\d{5}","tj":"\\d{6}","tm":"\\d{6}","tn":"\\d{4}","tr":"\\d{5}","tw":"\\d{3}(\\d{2})?","ua":"\\d{5}","us":"\\d{5}([ \\-]\\d{4})?","uy":"\\d{5}","uz":"\\d{6}","va":"00120","ve":"\\d{4}","vi":"008(([0-4]\\d)|(5[01]))([ \\-]\\d{4})?","wf":"986\\d{2}","yt":"976\\d{2}","yu":"\\d{5}","za":"\\d{4}","zm":"\\d{5}"};
+
+    find_regex = function(territory) {
+      var regex_str;
+      regex_str = postal_codes[territory];
+      if (regex_str != null) {
+        return regex_str;
+      } else {
+        return null;
+      }
+    };
+
+    PostalCodes.territories = function() {
+      var data, _;
+      return this.codes || (this.codes = (function() {
+        var _results;
+        _results = [];
+        for (data in postal_codes) {
+          _ = postal_codes[data];
+          _results.push(data);
+        }
+        return _results;
+      })());
+    };
+
+    PostalCodes.regex_for_territory = function(territory) {
+      var regex;
+      regex = find_regex(territory);
+      if (regex != null) {
+        return new RegExp(regex);
+      } else {
+        return null;
+      }
+    };
+
+    PostalCodes.is_valid = function(territory, postal_code) {
+      var regex;
+      regex = this.regex_for_territory(territory);
+      return regex.test(postal_code);
+    };
+
+    return PostalCodes;
+
+  })();
+
+  TwitterCldr.Languages = (function() {
+    var rtl_data;
+
+    function Languages() {}
+
+    Languages.all = {"aa":"Tiếng Afar","ab":"Tiếng Abkhazia","ace":"Tiếng Achinese","ach":"Tiếng Acoli","ada":"Tiếng Adangme","ady":"Tiếng Adyghe","ae":"Tiếng Avestan","af":"Tiếng Nam Phi","afa":"Ngôn ngữ Phi-Á","afh":"Tiếng Afrihili","agq":"Tiếng Aghem","ain":"Tiếng Ainu","ak":"Tiếng Akan","akk":"Tiếng Akkadia","ale":"Tiếng Aleut","alg":"Ngôn ngữ Algonquin","alt":"Tiếng Altai Miền Nam","am":"Tiếng Amharic","an":"Tiếng Aragon","ang":"Tiếng Anh cổ","anp":"Tiếng Angika","apa":"Ngôn ngữ Apache","ar":"Tiếng Ả Rập","ar-001":"Modern Standard Arabic","arc":"Tiếng Aramaic","arn":"Tiếng Araucanian","arp":"Tiếng Arapaho","art":"Ngôn ngữ Nhân tạo","arw":"Tiếng Arawak","as":"Tiếng Assam","asa":"Tiếng Asu","ast":"Tiếng Asturias","ath":"Ngôn ngữ Athapascan","aus":"Ngôn ngữ Châu Úc","av":"Tiếng Avaric","awa":"Tiếng Awadhi","ay":"Tiếng Aymara","az":"Tiếng Azeri","ba":"Tiếng Bashkir","bad":"Tiếng Banda","bai":"Ngôn ngữ Bamileke","bal":"Tiếng Baluchi","ban":"Tiếng Bali","bas":"Tiếng Basaa","bat":"Ngôn ngữ Baltic","bax":"Tiếng Bamun","bbj":"Tiếng Ghomala","be":"Tiếng Bê-la-rút","bej":"Tiếng Beja","bem":"Tiếng Bemba","ber":"Tiếng Berber","bez":"Tiếng Bena","bfd":"Tiếng Bafut","bg":"Tiếng Bun-ga-ri","bh":"Tiếng Bihari","bho":"Tiếng Bhojpuri","bi":"Tiếng Bislama","bik":"Tiếng Bikol","bin":"Tiếng Bini","bkm":"Tiếng Kom","bla":"Tiếng Siksika","bm":"Tiếng Bambara","bn":"Tiếng Bengali","bnt":"Tiếng Ban-tu","bo":"Tiếng Tây Tạng","br":"Tiếng Breton","bra":"Tiếng Braj","brx":"Tiếng Bodo","bs":"Tiếng Nam Tư","bss":"Tiếng Akoose","btk":"Tiếng Batak","bua":"Tiếng Buriat","bug":"Tiếng Bugin","bum":"Tiếng Bulu","byn":"Tiếng Blin","byv":"Tiếng Medumba","ca":"Tiếng Ca-ta-lăng","cad":"Tiếng Caddo","cai":"Ngôn ngữ Thổ dân Trung Mỹ","car":"Tiếng Carib","cau":"Ngôn ngữ Cáp-ca","cay":"Tiếng Cayuga","cch":"Tiếng Atsam","ce":"Tiếng Chechen","ceb":"Tiếng Cebuano","cel":"Ngôn ngữ Xen-tơ","cgg":"Tiếng Chiga","ch":"Tiếng Chamorro","chb":"Tiếng Chibcha","chg":"Tiếng Chagatai","chk":"Tiếng Chuuk","chm":"Tiếng Mari","chn":"Biệt ngữ Chinook","cho":"Tiếng Choctaw","chp":"Tiếng Chipewyan","chr":"Tiếng Cherokee","chy":"Tiếng Cheyenne","ckb":"Tiếng Kurd Sorani","cmc":"Ngôn ngữ Chamic","co":"Tiếng Corse","cop":"Tiếng Coptic","cpe":"Tiếng Creole hoặc Pidgin gốc Anh","cpf":"Tiếng Creole hoặc Pidgin gốc Pháp","cpp":"Tiếng Creole hoặc Pidgin gốc Bồ Đào Nha","cr":"Tiếng Cree","crh":"Tiếng Thổ Nhĩ Kỳ Crimean","crp":"Tiếng Creole hoặc Pidgin","cs":"Tiếng Séc","csb":"Tiếng Kashubia","cu":"Tiếng Slavơ Nhà thờ","cus":"Tiếng Cushit","cv":"Tiếng Chuvash","cy":"Tiếng Xentơ","da":"Tiếng Đan Mạch","dak":"Tiếng Dakota","dar":"Tiếng Dargwa","dav":"Tiếng Taita","day":"Tiếng Dayak","de":"Tiếng Đức","de-AT":"Austrian German","de-CH":"Tiếng Đức Chuẩn (Thụy Sĩ)","del":"Tiếng Delaware","den":"Tiếng Slave","dgr":"Tiếng Dogrib","din":"Tiếng Dinka","dje":"Tiếng Zarma","doi":"Tiếng Dogri","dra":"Ngôn ngữ Dravidia","dsb":"Tiếng Hạ Sorbia","dua":"Tiếng Duala","dum":"Tiếng Hà Lan Trung cổ","dv":"Tiếng Divehi","dyo":"Tiếng Jola-Fonyi","dyu":"Tiếng Dyula","dz":"Tiếng Dzongkha","dzg":"Tiếng Dazaga","ebu":"Tiếng Embu","ee":"Tiếng Ewe","efi":"Tiếng Efik","egy":"Tiếng Ai Cập cổ","eka":"Tiếng Ekajuk","el":"Tiếng Hy Lạp","elx":"Tiếng Elamite","en":"Tiếng Anh","en-AU":"Australian English","en-CA":"Tiếng Anh (Canada)","en-GB":"Tiếng Anh (Anh)","en-US":"Tiếng Anh (Mỹ)","enm":"Tiếng Anh Trung cổ","eo":"Tiếng Quốc Tế Ngữ","es":"Tiếng Tây Ban Nha","es-419":"Tiếng Tây Ban Nha (Mỹ La tinh)","es-ES":"Tiếng Tây Ban Nha (I-bê-ri)","et":"Tiếng E-xtô-ni-a","eu":"Tiếng Basque","ewo":"Tiếng Ewondo","fa":"Tiếng Ba Tư","fan":"Tiếng Fang","fat":"Tiếng Fanti","ff":"Tiếng Fulah","fi":"Tiếng Phần Lan","fil":"Tiếng Philipin","fiu":"Ngôn ngữ Finno-Ugrian","fj":"Tiếng Fiji","fo":"Tiếng Faore","fon":"Tiếng Fon","fr":"Tiếng Pháp","fr-CA":"Tiếng Pháp (Canada)","fr-CH":"Swiss French","frm":"Tiếng Pháp Trung cổ","fro":"Tiếng Pháp cổ","frr":"Tiếng Frisian Miền Bắc","frs":"Tiếng Frisian Miền Đông","fur":"Tiếng Friulian","fy":"Tiếng Frisian","ga":"Tiếng Ai-len","gaa":"Ga","gay":"Tiếng Gayo","gba":"Tiếng Gbaya","gd":"Tiếng Xentơ (Xcốt len)","gem":"Ngôn ngữ Giéc-man","gez":"Tiếng Geez","gil":"Tiếng Gilbert","gl":"Tiếng Galician","gmh":"Tiếng Thượng Giéc-man Trung cổ","gn":"Tiếng Guarani","goh":"Tiếng Thượng Giéc-man cổ","gon":"Tiếng Gondi","gor":"Tiếng Gorontalo","got":"Tiếng Gô-tích","grb":"Tiếng Grebo","grc":"Tiếng Hy Lạp cổ","gsw":"Tiếng Đức Thụy Sĩ","gu":"Tiếng Gujarati","guz":"Tiếng Gusii","gv":"Tiếng Manx","gwi":"Tiếng Gwichʼin","ha":"Tiếng Hausa","hai":"Tiếng Haida","haw":"Tiếng Hawaii","he":"Tiếng Hê-brơ","hi":"Tiếng Hin-đi","hil":"Tiếng Hiligaynon","him":"Tiếng Himachali","hit":"Tiếng Hittite","hmn":"Tiếng Hmông","ho":"Tiếng Hiri Motu","hr":"Tiếng Crô-a-ti-a","hsb":"Tiếng Thượng Sorbia","ht":"Tiếng Haiti","hu":"Tiếng Hung-ga-ri","hup":"Tiếng Hupa","hy":"Tiếng Ác-mê-ni","hz":"Tiếng Herero","ia":"Tiếng Khoa Học Quốc Tế","iba":"Tiếng Iban","ibb":"Tiếng Ibibio","id":"Tiếng In-đô-nê-xia","ie":"Tiếng Interlingue","ig":"Tiếng Igbo","ii":"Tiếng Di Tứ Xuyên","ijo":"Tiếng Ijo","ik":"Tiếng Inupiaq","ilo":"Tiếng Iloko","inc":"Ngôn ngữ Indic","ine":"Ngôn ngữ Ấn-Âu","inh":"Tiếng Ingush","io":"Tiếng Ido","ira":"Ngôn ngữ Iran","iro":"Ngôn ngữ Iroquoia","is":"Tiếng Ai-xơ-len","it":"Tiếng Ý","iu":"Tiếng Inuktitut","ja":"Tiếng Nhật","jbo":"Tiếng Lojban","jgo":"Ngomba","jmc":"Tiếng Machame","jpr":"Tiếng Judeo-Ba Tư","jrb":"Tiếng Judeo-Ả Rập","jv":"Tiếng Gia-va","ka":"Tiếng Georgian","kaa":"Tiếng Kara-Kalpak","kab":"Tiếng Kabyle","kac":"Tiếng Kachin","kaj":"Tiếng Jju","kam":"Tiếng Kamba","kar":"Tiếng Karen","kaw":"Tiếng Kawi","kbd":"Tiếng Kabardian","kbl":"Tiếng Kanembu","kcg":"Tiếng Tyap","kde":"Tiếng Makonde","kea":"Tiếng Kabuverdianu","kfo":"Tiếng Koro","kg":"Tiếng Congo","kha":"Tiếng Khasi","khi":"Ngôn ngữ Khoisan","kho":"Tiếng Khotan","khq":"Tiếng Koyra Chiini","ki":"Tiếng Kikuyu","kj":"Tiếng Kuanyama","kk":"Tiếng Kazakh","kkj":"Tiếng Kako","kl":"Tiếng Kalaallisut","kln":"Tiếng Kalenjin","km":"Tiếng Campuchia","kmb":"Tiếng Kimbundu","kn":"Tiếng Kan-na-đa","ko":"Tiếng Hàn Quốc","kok":"Tiếng Konkani","kos":"Tiếng Kosrae","kpe":"Tiếng Kpelle","kr":"Tiếng Kanuri","krc":"Tiếng Karachay-Balkar","krl":"Tiếng Karelian","kro":"Tiếng Kru","kru":"Tiếng Kurukh","ks":"Tiếng Kashmiri","ksb":"Tiếng Shambala","ksf":"Tiếng Bafia","ksh":"Tiếng Cologne","ku":"Tiếng Kurd","kum":"Tiếng Kumyk","kut":"Tiếng Kutenai","kv":"Tiếng Komi","kw":"Tiếng Cornish","ky":"Tiếng Kyrgyz","la":"Tiếng La-tinh","lad":"Tiếng Ladino","lag":"Tiếng Langi","lah":"Tiếng Lahnda","lam":"Tiếng Lamba","lb":"Tiếng Luxembourg","lez":"Tiếng Lezghian","lg":"Tiếng Ganda","li":"Tiếng Limburg","lkt":"Lakota","ln":"Tiếng Lingala","lo":"Tiếng Lào","lol":"Tiếng Mongo","loz":"Tiếng Lozi","lt":"Tiếng Lít-va","lu":"Tiếng Luba-Katanga","lua":"Tiếng Luba-Lulua","lui":"Tiếng Luiseno","lun":"Tiếng Lunda","luo":"Tiếng Luo","lus":"Tiếng Lushai","luy":"Tiếng Luyia","lv":"Tiếng Lát-vi-a","mad":"Tiếng Madura","maf":"Tiếng Mafa","mag":"Tiếng Magahi","mai":"Tiếng Maithili","mak":"Tiếng Makasar","man":"Tiếng Mandingo","map":"Ngôn ngữ Úc-Á","mas":"Tiếng Masai","mde":"Tiếng Maba","mdf":"Tiếng Moksha","mdr":"Tiếng Mandar","men":"Tiếng Mende","mer":"Tiếng Meru","mfe":"Tiếng Morisyen","mg":"Tiếng Malagasy","mga":"Tiếng Ai-len Trung cổ","mgh":"Tiếng Makhuwa-Meetto","mgo":"Meta'","mh":"Tiếng Marshall","mi":"Tiếng Maori","mic":"Tiếng Micmac","min":"Tiếng Minangkabau","mis":"Ngôn ngữ Khác","mk":"Tiếng Ma-xê-đô-ni-a","mkh":"Ngôn ngữ Mon-Khmer","ml":"Tiếng Malayalam","mn":"Tiếng Mông Cổ","mnc":"Tiếng Manchu","mni":"Tiếng Manipuri","mno":"Ngôn ngữ Manobo","mo":"Tiếng Moldova","moh":"Tiếng Mohawk","mos":"Tiếng Mossi","mr":"Tiếng Marathi","ms":"Tiếng Ma-lay-xi-a","mt":"Tiếng Mantơ","mua":"Tiếng Mundang","mul":"Nhiều Ngôn ngữ","mun":"Ngôn ngữ Munda","mus":"Tiếng Creek","mwl":"Tiếng Miranda","mwr":"Tiếng Marwari","my":"Tiếng Miến Điện","mye":"Tiếng Myene","myn":"Ngôn ngữ Maya","myv":"Tiếng Erzya","na":"Tiếng Nauru","nah":"Tiếng Nahuatl","nai":"Ngôn ngữ Thổ dân Bắc Mỹ","nap":"Tiếng Napoli","naq":"Tiếng Nama","nb":"Tiếng Na Uy (Bokmål)","nd":"Bắc Ndebele","nds":"Tiếng Hạ Giéc-man","ne":"Tiếng Nê-pan","new":"Tiếng Newari","ng":"Tiếng Ndonga","nia":"Tiếng Nias","nic":"Ngôn ngữ Niger-Kordofan","niu":"Tiếng Niuean","nl":"Tiếng Hà Lan","nl-BE":"Tiếng Flemish","nmg":"Tiếng Kwasio","nn":"Tiếng Na Uy (Nynorsk)","nnh":"Tiếng Ngiemboon","no":"Tiếng Na Uy","nog":"Tiếng Nogai","non":"Tiếng Na Uy cổ","nqo":"Tiếng N'Ko","nr":"Tiếng Ndebele Miền Nam","nso":"Bắc Sotho","nub":"Ngôn ngữ Nubia","nus":"Tiếng Nuer","nv":"Tiếng Navajo","nwc":"Tiếng Newari Cổ điển","ny":"Tiếng Nyanja","nym":"Tiếng Nyamwezi","nyn":"Tiếng Nyankole","nyo":"Tiếng Nyoro","nzi":"Tiếng Nzima","oc":"Tiếng Occitan","oj":"Tiếng Ojibwa","om":"Tiếng Oromo","or":"Tiếng Ô-ri-a","os":"Tiếng Ossetic","osa":"Tiếng Osage","ota":"Tiếng Thổ Nhĩ Kỳ Ottoman","oto":"Ngôn ngữ Otomia","pa":"Tiếng Punjabi","paa":"Ngôn ngữ Papua","pag":"Tiếng Pangasinan","pal":"Tiếng Pahlavi","pam":"Tiếng Pampanga","pap":"Tiếng Papiamento","pau":"Tiếng Palauan","peo":"Tiếng Ba Tư cổ","phi":"Ngôn ngữ Philippine","phn":"Tiếng Phoenicia","pi":"Tiếng Pali","pl":"Tiếng Ba Lan","pon":"Tiếng Pohnpeian","pra":"Ngôn ngữ Prakrit","pro":"Tiếng Provençal cổ","ps":"Tiếng Pushto","pt":"Tiếng Bồ Đào Nha","pt-BR":"Tiếng Bồ Đào Nha (Braxin)","pt-PT":"Tiếng Bồ Đào Nha (I-bê-ri)","qu":"Tiếng Quechua","raj":"Tiếng Rajasthani","rap":"Tiếng Rapanui","rar":"Tiếng Rarotongan","rm":"Tiếng Romansh","rn":"Tiếng Rundi","ro":"Tiếng Ru-ma-ni","roa":"Ngôn ngữ Roman","rof":"Tiếng Rombo","rom":"Tiếng Rumani","root":"Tiếng Root","ru":"Tiếng Nga","rup":"Tiếng Aromania","rw":"Tiếng Kinyarwanda","rwk":"Tiếng Rwa","sa":"Tiếng Phạn","sad":"Tiếng Sandawe","sah":"Tiếng Sakha","sai":"Ngôn ngữ Thổ dân Nam Mỹ","sal":"Ngôn ngữ Salishan","sam":"Tiếng Samaritan Aramaic","saq":"Tiếng Samburu","sas":"Tiếng Sasak","sat":"Tiếng Santali","sba":"Tiếng Ngambay","sbp":"Tiếng Sangu","sc":"Tiếng Sardinia","scn":"Tiếng Sicilia","sco":"Tiếng Scots","sd":"Tiếng Sin-hi","se":"Bắc Sami","see":"Tiếng Seneca","seh":"Tiếng Sena","sel":"Tiếng Selkup","sem":"Ngôn ngữ Semitic","ses":"Tiếng Koyraboro Senni","sg":"Tiếng Sango","sga":"Tiếng Ai-len cổ","sgn":"Ngôn ngữ Ký hiệu","sh":"Tiếng Xéc bi - Croatia","shi":"Tiếng Tachelhit","shn":"Tiếng Shan","shu":"Tiếng Ả-Rập Chad","si":"Tiếng Sinhala","sid":"Tiếng Sidamo","sio":"Ngôn ngữ Sioua","sit":"Ngôn ngữ Sino-Tây Tạng","sk":"Tiếng Xlô-vác","sl":"Tiếng Xlô-ven","sla":"Ngôn ngữ Slavơ","sm":"Tiếng Samoa","sma":"TIếng Sami Miền Nam","smi":"Ngôn ngữ Sami","smj":"Tiếng Lule Sami","smn":"Tiếng Inari Sami","sms":"Tiếng Skolt Sami","sn":"Tiếng Shona","snk":"Tiếng Soninke","so":"Tiếng Xô-ma-li","sog":"Tiếng Sogdien","son":"Tiếng Songhai","sq":"Tiếng An-ba-ni","sr":"Tiếng Séc-bi","srn":"Tiếng Sranan Tongo","srr":"Tiếng Serer","ss":"Tiếng Swati","ssa":"Ngôn ngữ Nilo-Sahara","ssy":"Tiếng Saho","st":"Tiếng Sesotho","su":"Tiếng Xu đăng","suk":"Tiếng Sukuma","sus":"Tiếng Susu","sux":"Tiếng Sumeria","sv":"Tiếng Thụy Điển","sw":"Tiếng Swahili","swb":"Tiếng Cômo","swc":"Tiếng Swahili Công-gô","syc":"Tiếng Syria Cổ điển","syr":"Tiếng Syriac","ta":"Tiếng Tamil","tai":"Ngôn ngữ Thái","te":"Tiếng Telugu","tem":"Tiếng Timne","teo":"Tiếng Teso","ter":"Tiếng Tereno","tet":"Tetum","tg":"Tiếng Tajik","th":"Tiếng Thái","ti":"Tiếng Tigrigya","tig":"Tiếng Tigre","tiv":"Tiếng Tiv","tk":"Tiếng Tuôc-men","tkl":"Tiếng Tokelau","tl":"Tiếng Tagalog","tlh":"Tiếng Klingon","tli":"Tiếng Tlingit","tmh":"Tiếng Tamashek","tn":"Tiếng Tswana","to":"Tiếng Tonga","tog":"Tiếng Nyasa Tonga","tpi":"Tiếng Tok Pisin","tr":"Tiếng Thổ Nhĩ Kỳ","trv":"Tiếng Taroko","ts":"Tiếng Tsonga","tsi":"Tiếng Tsimshian","tt":"Tiếng Tatar","tum":"Tiếng Tumbuka","tup":"Ngôn ngữ Tupi","tut":"Ngôn ngữ Altai","tvl":"Tiếng Tuvalu","tw":"Tiếng Twi","twq":"Tiếng Tasawaq","ty":"Tiếng Tahiti","tyv":"Tiếng Tuvinian","tzm":"Tiếng Tamazight Miền Trung Ma-rốc","udm":"Tiếng Udmurt","ug":"Tiếng Uyghur","uga":"Tiếng Ugaritic","uk":"Tiếng U-crai-na","umb":"Tiếng Umbundu","und":"Tiếng không xác định","ur":"Tiếng Uđu","uz":"Tiếng U-dơ-bếch","vai":"Tiếng Vai","ve":"Tiếng Venda","vi":"Tiếng Việt","vo":"Tiếng Volapük","vot":"Tiếng Votic","vun":"Tiếng Vunjo","wa":"Tiếng Walloon","wae":"Tiếng Walser","wak":"Ngôn ngữ Wakashan","wal":"Tiếng Walamo","war":"Tiếng Waray","was":"Tiếng Washo","wen":"Ngôn ngữ Sorbia","wo":"Tiếng Wolof","xal":"Tiếng Kalmyk","xh":"Tiếng Xhosa","xog":"Tiếng Soga","yao":"Tiếng Yao","yap":"Tiếng Yap","yav":"Tiếng Yangben","ybb":"Tiếng Yemba","yi":"Tiếng Y-đit","yo":"Tiếng Yoruba","ypk":"Tiếng Yupik","yue":"Tiếng Quảng Đông","za":"Tiếng Zhuang","zap":"Tiếng Zapotec","zbl":"Ký hiệu Blissymbols","zen":"Tiếng Zenaga","zh":"Tiếng Trung","zh-Hans":"Tiếng Trung (Giản thể)","zh-Hant":"Tiếng Trung (Phồn thể)","znd":"Tiếng Zande","zu":"Tiếng Zulu","zun":"Tiếng Zuni","zxx":"Không có nội dung ngôn ngữ","zza":"Tiếng Zaza"};
+
+    rtl_data = {"af":false,"ar":true,"be":false,"bg":false,"bn":false,"ca":false,"cs":false,"cy":false,"da":false,"de":false,"el":false,"en":false,"en-GB":false,"es":false,"eu":false,"fa":true,"fi":false,"fil":false,"fr":false,"ga":false,"gl":false,"he":true,"hi":false,"hr":false,"hu":false,"id":false,"is":false,"it":false,"ja":false,"ko":false,"lv":false,"ms":false,"nb":false,"nl":false,"pl":false,"pt":false,"ro":false,"ru":false,"sk":false,"sq":false,"sr":false,"sv":false,"ta":false,"th":false,"tr":false,"uk":false,"ur":true,"vi":false,"zh":false,"zh-Hant":false};
+
+    Languages.from_code = function(code) {
+      return this.all[code] || null;
+    };
+
+    Languages.is_rtl = function(locale) {
+      var result;
+      result = rtl_data[locale];
+      if (result != null) {
+        return result;
+      } else {
+        return null;
+      }
+    };
+
+    return Languages;
 
   })();
 

@@ -24,6 +24,8 @@
 
   TwitterCldr.is_rtl = false;
 
+  TwitterCldr.locale = "hi";
+
   TwitterCldr.Utilities = (function() {
     function Utilities() {}
 
@@ -571,7 +573,7 @@
     DateTimeFormatter.prototype.timezone = function(time, pattern, length) {
       var hours, minutes, offset, offsetString, sign;
       offset = time.getTimezoneOffset();
-      hours = ("00" + (Math.abs(offset) / 60).toString()).slice(-2);
+      hours = ("00" + (Math.floor(Math.abs(offset) / 60)).toString()).slice(-2);
       minutes = ("00" + (Math.abs(offset) % 60).toString()).slice(-2);
       sign = offset > 0 ? "-" : "+";
       offsetString = sign + hours + ":" + minutes;
@@ -746,7 +748,7 @@
     }
 
     NumberFormatter.prototype.format = function(number, options) {
-      var fraction, fraction_format, integer_format, intg, key, opts, prefix, result, sign, suffix, val, _ref, _ref1;
+      var fraction, fraction_format, integer_format, intg, key, opts, prefix, result, sign, suffix, tokens, val, _ref, _ref1;
       if (options == null) {
         options = {};
       }
@@ -755,18 +757,23 @@
         val = options[key];
         opts[key] = options[key] != null ? options[key] : opts[key];
       }
-      _ref = this.partition_tokens(this.get_tokens(number, opts)), prefix = _ref[0], suffix = _ref[1], integer_format = _ref[2], fraction_format = _ref[3];
-      number = this.transform_number(number);
-      _ref1 = this.parse_number(number, opts), intg = _ref1[0], fraction = _ref1[1];
-      result = integer_format.apply(parseFloat(intg), opts);
-      if (fraction) {
-        result += fraction_format.apply(fraction, opts);
+      tokens = this.get_tokens(number, opts);
+      if (tokens.join('') === '0') {
+        return number.toString();
+      } else {
+        _ref = this.partition_tokens(tokens), prefix = _ref[0], suffix = _ref[1], integer_format = _ref[2], fraction_format = _ref[3];
+        number = this.truncate_number(number, integer_format);
+        _ref1 = this.parse_number(number, opts), intg = _ref1[0], fraction = _ref1[1];
+        result = integer_format.apply(parseFloat(intg), opts);
+        if (fraction) {
+          result += fraction_format.apply(fraction, opts);
+        }
+        sign = number < 0 && prefix !== "-" ? this.symbols.minus_sign || this.default_symbols.minus_sign : "";
+        return "" + prefix + result + suffix;
       }
-      sign = number < 0 && prefix !== "-" ? this.symbols.minus_sign || this.default_symbols.minus_sign : "";
-      return "" + prefix + result + suffix;
     };
 
-    NumberFormatter.prototype.transform_number = function(number) {
+    NumberFormatter.prototype.truncate_number = function(number, integer_format) {
       return number;
     };
 
@@ -1001,12 +1008,11 @@
       return tokens;
     };
 
-    AbbreviatedNumberFormatter.prototype.transform_number = function(number) {
-      var factor, power;
-      if ((number < this.NUMBER_MAX) && (number >= this.NUMBER_MIN)) {
-        power = Math.floor((number.toString().length - 1) / 3) * 3;
-        factor = Math.pow(10, power);
-        return number / factor;
+    AbbreviatedNumberFormatter.prototype.truncate_number = function(number, integer_format) {
+      var factor;
+      if (this.NUMBER_MIN <= number && number < this.NUMBER_MAX) {
+        factor = Math.max(0, Math.floor(number).toString().length - integer_format.format.length);
+        return number / Math.pow(10, factor);
       } else {
         return number;
       }
@@ -1813,20 +1819,93 @@
     };
 
     PhoneCodes.code_for_territory = function(territory) {
-      var phone_code, result, territory_code, _ref;
-      result = null;
-      _ref = this.phone_codes;
-      for (territory_code in _ref) {
-        phone_code = _ref[territory_code];
-        if (territory_code === territory) {
-          result = phone_code;
-          break;
-        }
+      var result;
+      result = this.phone_codes[territory];
+      if (result != null) {
+        return result;
+      } else {
+        return null;
       }
-      return result;
     };
 
     return PhoneCodes;
+
+  })();
+
+  TwitterCldr.PostalCodes = (function() {
+    var find_regex, postal_codes;
+
+    function PostalCodes() {}
+
+    postal_codes = {"ad":"AD\\d{3}","am":"(37)?\\d{4}","ar":"([A-HJ-NP-Z])?\\d{4}([A-Z]{3})?","as":"96799","at":"\\d{4}","au":"\\d{4}","ax":"22\\d{3}","az":"\\d{4}","ba":"\\d{5}","bb":"(BB\\d{5})?","bd":"\\d{4}","be":"\\d{4}","bg":"\\d{4}","bh":"((1[0-2]|[2-9])\\d{2})?","bm":"[A-Z]{2}[ ]?[A-Z0-9]{2}","bn":"[A-Z]{2}[ ]?\\d{4}","br":"\\d{5}[\\-]?\\d{3}","by":"\\d{6}","ca":"[ABCEGHJKLMNPRSTVXY]\\d[ABCEGHJ-NPRSTV-Z][ ]?\\d[ABCEGHJ-NPRSTV-Z]\\d","cc":"6799","ch":"\\d{4}","ck":"\\d{4}","cl":"\\d{7}","cn":"\\d{6}","cr":"\\d{4,5}|\\d{3}-\\d{4}","cs":"\\d{5}","cv":"\\d{4}","cx":"6798","cy":"\\d{4}","cz":"\\d{3}[ ]?\\d{2}","de":"\\d{5}","dk":"\\d{4}","do":"\\d{5}","dz":"\\d{5}","ec":"([A-Z]\\d{4}[A-Z]|(?:[A-Z]{2})?\\d{6})?","ee":"\\d{5}","eg":"\\d{5}","es":"\\d{5}","et":"\\d{4}","fi":"\\d{5}","fk":"FIQQ 1ZZ","fm":"(9694[1-4])([ \\-]\\d{4})?","fo":"\\d{3}","fr":"\\d{2}[ ]?\\d{3}","gb":"GIR[ ]?0AA|((AB|AL|B|BA|BB|BD|BH|BL|BN|BR|BS|BT|CA|CB|CF|CH|CM|CO|CR|CT|CV|CW|DA|DD|DE|DG|DH|DL|DN|DT|DY|E|EC|EH|EN|EX|FK|FY|G|GL|GY|GU|HA|HD|HG|HP|HR|HS|HU|HX|IG|IM|IP|IV|JE|KA|KT|KW|KY|L|LA|LD|LE|LL|LN|LS|LU|M|ME|MK|ML|N|NE|NG|NN|NP|NR|NW|OL|OX|PA|PE|PH|PL|PO|PR|RG|RH|RM|S|SA|SE|SG|SK|SL|SM|SN|SO|SP|SR|SS|ST|SW|SY|TA|TD|TF|TN|TQ|TR|TS|TW|UB|W|WA|WC|WD|WF|WN|WR|WS|WV|YO|ZE)(\\d[\\dA-Z]?[ ]?\\d[ABD-HJLN-UW-Z]{2}))|BFPO[ ]?\\d{1,4}","ge":"\\d{4}","gf":"9[78]3\\d{2}","gg":"GY\\d[\\dA-Z]?[ ]?\\d[ABD-HJLN-UW-Z]{2}","gl":"39\\d{2}","gn":"\\d{3}","gp":"9[78][01]\\d{2}","gr":"\\d{3}[ ]?\\d{2}","gs":"SIQQ 1ZZ","gt":"\\d{5}","gu":"969[123]\\d([ \\-]\\d{4})?","gw":"\\d{4}","hm":"\\d{4}","hn":"(?:\\d{5})?","hr":"\\d{5}","ht":"\\d{4}","hu":"\\d{4}","id":"\\d{5}","ie":"((D|DUBLIN)?([1-9]|6[wW]|1[0-8]|2[024]))?","il":"\\d{5}","im":"IM\\d[\\dA-Z]?[ ]?\\d[ABD-HJLN-UW-Z]{2}","in":"\\d{6}","io":"BBND 1ZZ","iq":"\\d{5}","is":"\\d{3}","it":"\\d{5}","je":"JE\\d[\\dA-Z]?[ ]?\\d[ABD-HJLN-UW-Z]{2}","jo":"\\d{5}","jp":"\\d{3}-\\d{4}","ke":"\\d{5}","kg":"\\d{6}","kh":"\\d{5}","kr":"\\d{3}[\\-]\\d{3}","kw":"\\d{5}","kz":"\\d{6}","la":"\\d{5}","lb":"(\\d{4}([ ]?\\d{4})?)?","li":"(948[5-9])|(949[0-7])","lk":"\\d{5}","lr":"\\d{4}","ls":"\\d{3}","lt":"\\d{5}","lu":"\\d{4}","lv":"\\d{4}","ma":"\\d{5}","mc":"980\\d{2}","md":"\\d{4}","me":"8\\d{4}","mg":"\\d{3}","mh":"969[67]\\d([ \\-]\\d{4})?","mk":"\\d{4}","mn":"\\d{6}","mp":"9695[012]([ \\-]\\d{4})?","mq":"9[78]2\\d{2}","mt":"[A-Z]{3}[ ]?\\d{2,4}","mu":"(\\d{3}[A-Z]{2}\\d{3})?","mv":"\\d{5}","mx":"\\d{5}","my":"\\d{5}","nc":"988\\d{2}","ne":"\\d{4}","nf":"2899","ng":"(\\d{6})?","ni":"((\\d{4}-)?\\d{3}-\\d{3}(-\\d{1})?)?","nl":"\\d{4}[ ]?[A-Z]{2}","no":"\\d{4}","np":"\\d{5}","nz":"\\d{4}","om":"(PC )?\\d{3}","pf":"987\\d{2}","pg":"\\d{3}","ph":"\\d{4}","pk":"\\d{5}","pl":"\\d{2}-\\d{3}","pm":"9[78]5\\d{2}","pn":"PCRN 1ZZ","pr":"00[679]\\d{2}([ \\-]\\d{4})?","pt":"\\d{4}([\\-]\\d{3})?","pw":"96940","py":"\\d{4}","re":"9[78]4\\d{2}","ro":"\\d{6}","rs":"\\d{6}","ru":"\\d{6}","sa":"\\d{5}","se":"\\d{3}[ ]?\\d{2}","sg":"\\d{6}","sh":"(ASCN|STHL) 1ZZ","si":"\\d{4}","sj":"\\d{4}","sk":"\\d{3}[ ]?\\d{2}","sm":"4789\\d","sn":"\\d{5}","so":"\\d{5}","sz":"[HLMS]\\d{3}","tc":"TKCA 1ZZ","th":"\\d{5}","tj":"\\d{6}","tm":"\\d{6}","tn":"\\d{4}","tr":"\\d{5}","tw":"\\d{3}(\\d{2})?","ua":"\\d{5}","us":"\\d{5}([ \\-]\\d{4})?","uy":"\\d{5}","uz":"\\d{6}","va":"00120","ve":"\\d{4}","vi":"008(([0-4]\\d)|(5[01]))([ \\-]\\d{4})?","wf":"986\\d{2}","yt":"976\\d{2}","yu":"\\d{5}","za":"\\d{4}","zm":"\\d{5}"};
+
+    find_regex = function(territory) {
+      var regex_str;
+      regex_str = postal_codes[territory];
+      if (regex_str != null) {
+        return regex_str;
+      } else {
+        return null;
+      }
+    };
+
+    PostalCodes.territories = function() {
+      var data, _;
+      return this.codes || (this.codes = (function() {
+        var _results;
+        _results = [];
+        for (data in postal_codes) {
+          _ = postal_codes[data];
+          _results.push(data);
+        }
+        return _results;
+      })());
+    };
+
+    PostalCodes.regex_for_territory = function(territory) {
+      var regex;
+      regex = find_regex(territory);
+      if (regex != null) {
+        return new RegExp(regex);
+      } else {
+        return null;
+      }
+    };
+
+    PostalCodes.is_valid = function(territory, postal_code) {
+      var regex;
+      regex = this.regex_for_territory(territory);
+      return regex.test(postal_code);
+    };
+
+    return PostalCodes;
+
+  })();
+
+  TwitterCldr.Languages = (function() {
+    var rtl_data;
+
+    function Languages() {}
+
+    Languages.all = {"aa":"अफ़ार","ab":"अब्खाज़ियन्","ace":"अचाइनीस","ach":"अकोली","ada":"अदान्गमे","ady":"अदिघे","ae":"अवस्ताई","af":"अफ्रीकी","afa":"अफ़्रीकी-एशियाई भाषा","afh":"अफ्रिहिली","agq":"Aghem","ain":"ऐनू","ak":"अकन","akk":"अक्कादी","ale":"अलेउत","alg":"एल्गोनक्युइअन भाषा","alt":"दक्षिणी अल्ताई","am":"अम्हारी","an":"अर्गोनी","ang":"पुरानी अंग्रेज़ी","anp":"अंगिका","apa":"अपाचे भाषा","ar":"अरबी","ar-001":"आधुनिक मानक अरबी","arc":"ऐरेमेक","arn":"मापूचे","arp":"अराफाओ","art":"कृत्रिम भाषा","arw":"अरावक","as":"आसामी","asa":"Asu","ast":"अस्तुरियन","ath":"अथापास्कान भाषा","aus":"आस्ट्रेलियाई भाषा","av":"अवेरिक","awa":"अवधी","ay":"आयमारा","az":"अज़ेरी","ba":"बशख़िर","bad":"बांदा","bai":"बमिलेके भाषा","bal":"बलूची","ban":"बालिनीस","bas":"बसा","bat":"बाल्टिक भाषा","bax":"Bamun","bbj":"Ghomala","be":"बेलारूसी","bej":"बेजा","bem":"बेम्बा","ber":"बरबर","bez":"Bena","bfd":"Bafut","bg":"बुल्गारियाई","bh":"बिहारी","bho":"भोजपुरी","bi":"बिस्लामा","bik":"बिकोल","bin":"बिनी","bkm":"Kom","bla":"सिक्सिका","bm":"बाम्बारा","bn":"बंगाली","bnt":"बन्तु","bo":"तिब्बती","br":"ब्रेटन","bra":"ब्रज","brx":"Bodo","bs":"बोस्नियाई","bss":"Akoose","btk":"बताक","bua":"बुरियात","bug":"बगिनीस","bum":"Bulu","byn":"ब्लिन","byv":"Medumba","ca":"कातालान","cad":"कैड्डो","cai":"मध्य अमेरिकी इंडियन भाषा","car":"कैरिब","cau":"कॉकेशियन भाषा","cay":"Cayuga","cch":"अत्सम","ce":"चेचन","ceb":"सिबुआनो","cel":"केल्टिक भाषा","cgg":"Chiga","ch":"कमोरो","chb":"चिब्चा","chg":"छगाताई","chk":"चूकीस","chm":"मारी","chn":"चिनूक जारगॉन","cho":"चोक्तौ","chp":"शिपेव्यान","chr":"चेरोकी","chy":"शेयेन्न","ckb":"सोरानी कुर्द","cmc":"शैमिक भाषा","co":"कोर्सीकन","cop":"कॉप्टिक","cpe":"अंग्रेज़ी आधारित क्रेओल या पिजिन","cpf":"फ़्रांसीसी आधारित क्रेओल या पिजिन","cpp":"पुर्तगाली आधारित क्रेओल या पिजिन","cr":"क्री","crh":"क्रीमीन तुर्की","crp":"क्रेओल या पिजिन","cs":"चेक","csb":"काशुबियन","cu":"चर्च साल्विक","cus":"कुशितिक भाषा","cv":"चूवाश","cy":"वेल्श","da":"डेनिश","dak":"दाकोता","dar":"दार्गवा","dav":"Taita","day":"दायक","de":"जर्मन","de-AT":"Austrian German","de-CH":"स्विस हाई जर्मन","del":"डिलैवेयर","den":"स्लेव","dgr":"डोग्रिब","din":"दिन्का","dje":"Zarma","doi":"डोग्री","dra":"द्रविड़ भाषा","dsb":"निचला सॉर्बियन","dua":"दुआला","dum":"मध्य पुर्तगाली","dv":"दिवेही","dyo":"Jola-Fonyi","dyu":"ड्युला","dz":"ज़ोन्गखा","dzg":"Dazaga","ebu":"Embu","ee":"ईवे","efi":"एफिक","egy":"प्राचीन मिस्री","eka":"एकाजुक","el":"यूनानी","elx":"एलामाइट","en":"अंग्रेज़ी","en-AU":"Australian English","en-CA":"Canadian English","en-GB":"British English","en-US":"U.S. English","enm":"मध्यकालीन अंग्रेज़ी","eo":"एस्पेरान्तो","es":"स्पेनी","es-419":"Latin American Spanish","es-ES":"स्पेनी (यूरोप)","et":"एस्टोनियाई","eu":"बास्क","ewo":"इवोन्डो","fa":"फ़ारसी","fan":"फैन्ग","fat":"फन्टी","ff":"फुलाह","fi":"फ़िनिश","fil":"फ़िलिपीनो","fiu":"फिन्नो-उग्रीयन भाषा","fj":"फ़ीजी","fo":"फिरोज़ी","fon":"फॉन","fr":"फ़्रांसीसी","fr-CA":"Canadian French","fr-CH":"Swiss French","frm":"मध्यकालीन फ़्रांसीसी","fro":"पुरातन फ़्रांसीसी","frr":"उत्तरी फ्रीसीयन","frs":"पूर्वी फ्रीसीयन","fur":"फ्रीयुलीयान","fy":"पश्चिमी फ़्रिसियाई","ga":"आइरिश","gaa":"गा","gay":"गायो","gba":"ग्बाया","gd":"स्काट्स् गायेलिक्","gem":"जर्मनिक भाषा","gez":"गीज़","gil":"गिल्बरतीस","gl":"गैलिशियन्","gmh":"मध्यकालीन हाइ जर्मन","gn":"गुआरानी","goh":"पुरातन हाइ जर्मन","gon":"गाँडी","gor":"गोरोन्तालो","got":"गॉथिक","grb":"ग्रेबो","grc":"प्राचीन यूनानी","gsw":"स्विस जर्मन","gu":"गुजराती","guz":"Gusii","gv":"मैंक्स","gwi":"ग्विच'इन","ha":"होउसा","hai":"हैडा","haw":"हवाई","he":"हीब्रू","hi":"हिन्दी","hil":"हिलिगेनन","him":"हिमाचली","hit":"हिताइत","hmn":"ह्मॉंग","ho":"हिरी मोटू","hr":"क्रोएशियाई","hsb":"ऊपरी सॉर्बियन","ht":"हैतीयन","hu":"हंगेरी","hup":"हूपा","hy":"अरमेनियन्","hz":"हरैरो","ia":"ईन्टरलिंगुआ","iba":"इबान","ibb":"Ibibio","id":"इंडोनीशियाई","ie":"ईन्टरलिंगुइ","ig":"ईग्बो","ii":"सिचुआन यी","ijo":"इजो","ik":"इनुपियाक्","ilo":"इलोको","inc":"भारतीय भाषा","ine":"इंडो-युरोपीय भाषा","inh":"इंगुश","io":"इडौ","ira":"ईरानी भाषा","iro":"इरोक्युओइयन भाषा","is":"आइसलैंडी","it":"इतालवी","iu":"इनूकीटूत्","ja":"जापानी","jbo":"लोज्बान","jgo":"Ngomba","jmc":"Machame","jpr":"जुदेओ-पर्शियन","jrb":"जुदेओ-अरेबिक","jv":"जावानीस","ka":"जॉर्जियाई","kaa":"कारा-कल्पक","kab":"कबाइल","kac":"काचिन","kaj":"ज्जु","kam":"कम्बा","kar":"कारेन","kaw":"कावी","kbd":"कबार्डियन","kbl":"Kanembu","kcg":"त्याप","kde":"Makonde","kea":"Kabuverdianu","kfo":"कोरो","kg":"कोंगो","kha":"खासी","khi":"खोइसन भाषा","kho":"खोतानीस","khq":"Koyra Chiini","ki":"किकुयू","kj":"क्वान्यामा","kk":"कज़ाख","kkj":"Kako","kl":"ग्रीनलैंडिक","kln":"Kalenjin","km":"कैम्बोडियन्","kmb":"किम्बन्दु","kn":"कन्नड़","ko":"कोरियाई","kok":"कोंकणी","kos":"कोसरैन","kpe":"क्पेल्लै","kr":"कनुरी","krc":"कराचय-बल्कार","krl":"करेलियन","kro":"क्रु","kru":"कुरूख","ks":"कश्मीरी","ksb":"Shambala","ksf":"Bafia","ksh":"Colognian","ku":"कुर्दी","kum":"कुमीक","kut":"कुतेनाई","kv":"कोमी","kw":"कोर्निश","ky":"किरघिज़","la":"लातिनी","lad":"लादीनो","lag":"Langi","lah":"लाह्न्डा","lam":"लाम्बा","lb":"लक्ष्ज़ेमबर्गिश","lez":"लेज़्घीयन","lg":"गांडा","li":"लिंबर्गिश","lkt":"Lakota","ln":"लिंगाला","lo":"लाओ","lol":"मोंगो","loz":"लोज़ी","lt":"लिथुएनियाई","lu":"ल्यूबा-कटांगा","lua":"ल्यूबा-लुलुआ","lui":"लुइसेनो","lun":"लुन्डा","luo":"ल्युओ","lus":"लुशाई","luy":"Luyia","lv":"लातवी","mad":"मादुरीस","maf":"Mafa","mag":"मगाही","mai":"मैथिली","mak":"मकासर","man":"मन्डिन्गो","map":"ऑस्ट्रोनेशियन","mas":"मसाई","mde":"Maba","mdf":"मोक्ष","mdr":"मंधार","men":"मेन्डे","mer":"Meru","mfe":"मोरीस्येन","mg":"मालागासी","mga":"मध्यकाल आइरिश","mgh":"Makhuwa-Meetto","mgo":"Meta'","mh":"मार्शलीज़","mi":"माओरी","mic":"मिकमैक","min":"मिनांग्काबाउ","mis":"विविध भाषा","mk":"मैसिडोनियाई","mkh":"मॉन-ख्मेर भाषा","ml":"मलयालम","mn":"मंगोलीयाई","mnc":"मन्चु","mni":"मणिपूरी","mno":"मनोबो भाषा","mo":"मोलडावियन्","moh":"मोहौक","mos":"मोस्सी","mr":"मराठी","ms":"मलय","mt":"माल्टी","mua":"Mundang","mul":"विविध भाषाएँ","mun":"मुन्डा भाषा","mus":"क्रीक","mwl":"मिरांडी","mwr":"मारवाड़ी","my":"बर्मी","mye":"Myene","myn":"माया भाषा","myv":"एर्ज़या","na":"नाउरू","nah":"नहुआत्ल","nai":"उत्तरी अमेरीकी इंडियन भाषा","nap":"नीपोलिटन","naq":"Nama","nb":"नॉर्वेजियाई बोकमाल","nd":"उत्तरी देबेल","nds":"निचला जर्मन","ne":"नेपाली","new":"नेवाड़ी","ng":"डोन्गा","nia":"नियास","nic":"नाइगर-कोर्डोफैनियन भाषा","niu":"नियुआन","nl":"डच","nl-BE":"फ़्लेमिश","nmg":"Kwasio","nn":"नॉर्वेजियाई नाइनोर्स्क","nnh":"Ngiemboon","no":"नॉर्वेजियाई","nog":"नोगाई","non":"पुराना नॉर्स","nqo":"एन्को","nr":"दक्षिण देबेल","nso":"उत्तरी सोथो","nub":"न्युबियान भाषा","nus":"Nuer","nv":"नावाजो","nwc":"पारम्परिक नेवारी","ny":"न्यानजा","nym":"न्यामवेज़ी","nyn":"न्यानकोल","nyo":"न्योरो","nzi":"न्ज़ीमा","oc":"ओसीटान","oj":"ओजिब्वा","om":"ओरोमो","or":"उड़िया","os":"ओस्सेटिक","osa":"ओसेज","ota":"ओटोमान तुर्किश","oto":"ओटोमियन भाषा","pa":"पंजाबी","paa":"पापुआन भाषा","pag":"पंगासीनान","pal":"पाह्लावी","pam":"पाम्पान्गा","pap":"पापियामेन्टो","pau":"पलोउआन","peo":"पुरानी फारसी","phi":"फिलिपीन भाषा","phn":"फोएनिशियन","pi":"पाली","pl":"पोलिश","pon":"पोह्नपिएन","pra":"प्राकृत","pro":"पुरानी प्रोवेन्सल","ps":"पुश्तो","pt":"पुर्तगाली","pt-BR":"Brazilian Portuguese","pt-PT":"पुर्तगाली (यूरोप)","qu":"क्वेशुआ","raj":"राजस्थानी","rap":"रापानुई","rar":"रारोतोंगन","rm":"रोमान्श","rn":"रुन्दी","ro":"रोमानियाई","roa":"रोमांस भाषा","rof":"Rombo","rom":"रोमानी","root":"रूट","ru":"रूसी","rup":"अरोमानियन","rw":"किन्यारवाण्डा","rwk":"Rwa","sa":"संस्कृत","sad":"सन्डावे","sah":"याकूत","sai":"दक्षिण अमेरीकी इंडियन भाषा","sal":"सलीशन भाषा","sam":"सामैरिटन अरैमिक","saq":"Samburu","sas":"सासाक","sat":"संताली","sba":"Ngambay","sbp":"Sangu","sc":"सार्दिनियन","scn":"सिसिलियन","sco":"स्कॉट्स","sd":"सिन्धी","se":"नॉर्दन सामी","see":"Seneca","seh":"Sena","sel":"सेल्कप","sem":"सेमिटिक भाषा","ses":"Koyraboro Senni","sg":"सांगो","sga":"पुरानी आइरिश","sgn":"सांकेतिक भाषा","sh":"सेर्बो-क्रोएशन्","shi":"Tachelhit","shn":"शैन","shu":"Chadian Arabic","si":"सिंहली","sid":"सिदामो","sio":"सिउआन भाषा","sit":"चीनी-तिब्ब्ती भाषा","sk":"स्लोवाक","sl":"स्लोवेनियन्","sla":"स्लोवियाई भाषा","sm":"सामोन","sma":"दक्षिण सामी","smi":"सामी भाषा","smj":"ल्युल सामी","smn":"इनारी सामी","sms":"स्कोल्ट सामी","sn":"सोणा","snk":"सोनिन्के","so":"सोमाली","sog":"सोग्डिएन","son":"सोन्घाई","sq":"अल्बेनियन्","sr":"सर्बी","srn":"स्रानान टॉन्गो","srr":"सेरेर","ss":"स्वाती","ssa":"नील सहारी भाषा","ssy":"Saho","st":"सेसोथो","su":"सुंडानी","suk":"सुकुमा","sus":"सुसु","sux":"सुमेरियन","sv":"स्वीडिश","sw":"स्वाहिली","swb":"कोमोरियन","swc":"Congo Swahili","syc":"क्लासिकल सिरिएक","syr":"सिरिएक","ta":"तमिल","tai":"ताई भाषा","te":"तेलुगू","tem":"टिम्ने","teo":"Teso","ter":"तेरेनो","tet":"तेतुम","tg":"ताजिक","th":"थाई","ti":"तिग्रीन्या","tig":"टाइग्रे","tiv":"तिव","tk":"तुर्कमेन","tkl":"तोकेलाऊ","tl":"तागालोग","tlh":"क्लिंगन","tli":"त्लिंगित","tmh":"तामाशेक","tn":"सेत्स्वाना","to":"टोंगा","tog":"न्यासा टोन्गा","tpi":"टोक पिसिन","tr":"तुर्की","trv":"Taroko","ts":"सोंगा","tsi":"त्सिमीशियन","tt":"टाटर","tum":"तम्बूका","tup":"ट्यूपी भाषा","tut":"अल्तैक भाषा","tvl":"तुवालु","tw":"ट्वी","twq":"Tasawaq","ty":"ताहितियन","tyv":"तुवीनियन","tzm":"Central Atlas Tamazight","udm":"उदमुर्त","ug":"विग्वर","uga":"युगैरिटिक","uk":"यूक्रेनी","umb":"उम्बुन्डु","und":"अज्ञात भाषा","ur":"उर्दू","uz":"उज़्बेक","vai":"वाई","ve":"वेन्दा","vi":"वियतनामी","vo":"वोलापुक","vot":"वॉटिक","vun":"Vunjo","wa":"वाल्लून","wae":"Walser","wak":"वाकाशन भाषा","wal":"वलामो","war":"वारै","was":"वाशो","wen":"सॉर्बियन भाषा","wo":"वोलोफ़","xal":"काल्मिक","xh":"ख़ोसा","xog":"Soga","yao":"याओ","yap":"यापीस","yav":"Yangben","ybb":"Yemba","yi":"येहुदी","yo":"योरूबा","ypk":"यूपिक भाषा","yue":"कैंटोनीस","za":"ज़ुआंग","zap":"ज़ेपोटेक","zbl":"ब्लिसिम्बॉल्स","zen":"ज़ेनान्गा","zh":"चीनी","zh-Hans":"Simplified Chinese","zh-Hant":"Traditional Chinese","znd":"ज़न्डे","zu":"ज़ुलू","zun":"ज़ूनी","zxx":"कोई लिंग्विस्ट सामग्री नहीं","zza":"ज़ाज़ा"};
+
+    rtl_data = {"af":false,"ar":true,"be":false,"bg":false,"bn":false,"ca":false,"cs":false,"cy":false,"da":false,"de":false,"el":false,"en":false,"en-GB":false,"es":false,"eu":false,"fa":true,"fi":false,"fil":false,"fr":false,"ga":false,"gl":false,"he":true,"hi":false,"hr":false,"hu":false,"id":false,"is":false,"it":false,"ja":false,"ko":false,"lv":false,"ms":false,"nb":false,"nl":false,"pl":false,"pt":false,"ro":false,"ru":false,"sk":false,"sq":false,"sr":false,"sv":false,"ta":false,"th":false,"tr":false,"uk":false,"ur":true,"vi":false,"zh":false,"zh-Hant":false};
+
+    Languages.from_code = function(code) {
+      return this.all[code] || null;
+    };
+
+    Languages.is_rtl = function(locale) {
+      var result;
+      result = rtl_data[locale];
+      if (result != null) {
+        return result;
+      } else {
+        return null;
+      }
+    };
+
+    return Languages;
 
   })();
 

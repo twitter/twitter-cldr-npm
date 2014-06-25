@@ -24,6 +24,8 @@
 
   TwitterCldr.is_rtl = true;
 
+  TwitterCldr.locale = "he";
+
   TwitterCldr.Utilities = (function() {
     function Utilities() {}
 
@@ -571,7 +573,7 @@
     DateTimeFormatter.prototype.timezone = function(time, pattern, length) {
       var hours, minutes, offset, offsetString, sign;
       offset = time.getTimezoneOffset();
-      hours = ("00" + (Math.abs(offset) / 60).toString()).slice(-2);
+      hours = ("00" + (Math.floor(Math.abs(offset) / 60)).toString()).slice(-2);
       minutes = ("00" + (Math.abs(offset) % 60).toString()).slice(-2);
       sign = offset > 0 ? "-" : "+";
       offsetString = sign + hours + ":" + minutes;
@@ -746,7 +748,7 @@
     }
 
     NumberFormatter.prototype.format = function(number, options) {
-      var fraction, fraction_format, integer_format, intg, key, opts, prefix, result, sign, suffix, val, _ref, _ref1;
+      var fraction, fraction_format, integer_format, intg, key, opts, prefix, result, sign, suffix, tokens, val, _ref, _ref1;
       if (options == null) {
         options = {};
       }
@@ -755,18 +757,23 @@
         val = options[key];
         opts[key] = options[key] != null ? options[key] : opts[key];
       }
-      _ref = this.partition_tokens(this.get_tokens(number, opts)), prefix = _ref[0], suffix = _ref[1], integer_format = _ref[2], fraction_format = _ref[3];
-      number = this.transform_number(number);
-      _ref1 = this.parse_number(number, opts), intg = _ref1[0], fraction = _ref1[1];
-      result = integer_format.apply(parseFloat(intg), opts);
-      if (fraction) {
-        result += fraction_format.apply(fraction, opts);
+      tokens = this.get_tokens(number, opts);
+      if (tokens.join('') === '0') {
+        return number.toString();
+      } else {
+        _ref = this.partition_tokens(tokens), prefix = _ref[0], suffix = _ref[1], integer_format = _ref[2], fraction_format = _ref[3];
+        number = this.truncate_number(number, integer_format);
+        _ref1 = this.parse_number(number, opts), intg = _ref1[0], fraction = _ref1[1];
+        result = integer_format.apply(parseFloat(intg), opts);
+        if (fraction) {
+          result += fraction_format.apply(fraction, opts);
+        }
+        sign = number < 0 && prefix !== "-" ? this.symbols.minus_sign || this.default_symbols.minus_sign : "";
+        return "" + prefix + result + suffix;
       }
-      sign = number < 0 && prefix !== "-" ? this.symbols.minus_sign || this.default_symbols.minus_sign : "";
-      return "" + prefix + result + suffix;
     };
 
-    NumberFormatter.prototype.transform_number = function(number) {
+    NumberFormatter.prototype.truncate_number = function(number, integer_format) {
       return number;
     };
 
@@ -1001,12 +1008,11 @@
       return tokens;
     };
 
-    AbbreviatedNumberFormatter.prototype.transform_number = function(number) {
-      var factor, power;
-      if ((number < this.NUMBER_MAX) && (number >= this.NUMBER_MIN)) {
-        power = Math.floor((number.toString().length - 1) / 3) * 3;
-        factor = Math.pow(10, power);
-        return number / factor;
+    AbbreviatedNumberFormatter.prototype.truncate_number = function(number, integer_format) {
+      var factor;
+      if (this.NUMBER_MIN <= number && number < this.NUMBER_MAX) {
+        factor = Math.max(0, Math.floor(number).toString().length - integer_format.format.length);
+        return number / Math.pow(10, factor);
       } else {
         return number;
       }
@@ -1813,20 +1819,93 @@
     };
 
     PhoneCodes.code_for_territory = function(territory) {
-      var phone_code, result, territory_code, _ref;
-      result = null;
-      _ref = this.phone_codes;
-      for (territory_code in _ref) {
-        phone_code = _ref[territory_code];
-        if (territory_code === territory) {
-          result = phone_code;
-          break;
-        }
+      var result;
+      result = this.phone_codes[territory];
+      if (result != null) {
+        return result;
+      } else {
+        return null;
       }
-      return result;
     };
 
     return PhoneCodes;
+
+  })();
+
+  TwitterCldr.PostalCodes = (function() {
+    var find_regex, postal_codes;
+
+    function PostalCodes() {}
+
+    postal_codes = {"ad":"AD\\d{3}","am":"(37)?\\d{4}","ar":"([A-HJ-NP-Z])?\\d{4}([A-Z]{3})?","as":"96799","at":"\\d{4}","au":"\\d{4}","ax":"22\\d{3}","az":"\\d{4}","ba":"\\d{5}","bb":"(BB\\d{5})?","bd":"\\d{4}","be":"\\d{4}","bg":"\\d{4}","bh":"((1[0-2]|[2-9])\\d{2})?","bm":"[A-Z]{2}[ ]?[A-Z0-9]{2}","bn":"[A-Z]{2}[ ]?\\d{4}","br":"\\d{5}[\\-]?\\d{3}","by":"\\d{6}","ca":"[ABCEGHJKLMNPRSTVXY]\\d[ABCEGHJ-NPRSTV-Z][ ]?\\d[ABCEGHJ-NPRSTV-Z]\\d","cc":"6799","ch":"\\d{4}","ck":"\\d{4}","cl":"\\d{7}","cn":"\\d{6}","cr":"\\d{4,5}|\\d{3}-\\d{4}","cs":"\\d{5}","cv":"\\d{4}","cx":"6798","cy":"\\d{4}","cz":"\\d{3}[ ]?\\d{2}","de":"\\d{5}","dk":"\\d{4}","do":"\\d{5}","dz":"\\d{5}","ec":"([A-Z]\\d{4}[A-Z]|(?:[A-Z]{2})?\\d{6})?","ee":"\\d{5}","eg":"\\d{5}","es":"\\d{5}","et":"\\d{4}","fi":"\\d{5}","fk":"FIQQ 1ZZ","fm":"(9694[1-4])([ \\-]\\d{4})?","fo":"\\d{3}","fr":"\\d{2}[ ]?\\d{3}","gb":"GIR[ ]?0AA|((AB|AL|B|BA|BB|BD|BH|BL|BN|BR|BS|BT|CA|CB|CF|CH|CM|CO|CR|CT|CV|CW|DA|DD|DE|DG|DH|DL|DN|DT|DY|E|EC|EH|EN|EX|FK|FY|G|GL|GY|GU|HA|HD|HG|HP|HR|HS|HU|HX|IG|IM|IP|IV|JE|KA|KT|KW|KY|L|LA|LD|LE|LL|LN|LS|LU|M|ME|MK|ML|N|NE|NG|NN|NP|NR|NW|OL|OX|PA|PE|PH|PL|PO|PR|RG|RH|RM|S|SA|SE|SG|SK|SL|SM|SN|SO|SP|SR|SS|ST|SW|SY|TA|TD|TF|TN|TQ|TR|TS|TW|UB|W|WA|WC|WD|WF|WN|WR|WS|WV|YO|ZE)(\\d[\\dA-Z]?[ ]?\\d[ABD-HJLN-UW-Z]{2}))|BFPO[ ]?\\d{1,4}","ge":"\\d{4}","gf":"9[78]3\\d{2}","gg":"GY\\d[\\dA-Z]?[ ]?\\d[ABD-HJLN-UW-Z]{2}","gl":"39\\d{2}","gn":"\\d{3}","gp":"9[78][01]\\d{2}","gr":"\\d{3}[ ]?\\d{2}","gs":"SIQQ 1ZZ","gt":"\\d{5}","gu":"969[123]\\d([ \\-]\\d{4})?","gw":"\\d{4}","hm":"\\d{4}","hn":"(?:\\d{5})?","hr":"\\d{5}","ht":"\\d{4}","hu":"\\d{4}","id":"\\d{5}","ie":"((D|DUBLIN)?([1-9]|6[wW]|1[0-8]|2[024]))?","il":"\\d{5}","im":"IM\\d[\\dA-Z]?[ ]?\\d[ABD-HJLN-UW-Z]{2}","in":"\\d{6}","io":"BBND 1ZZ","iq":"\\d{5}","is":"\\d{3}","it":"\\d{5}","je":"JE\\d[\\dA-Z]?[ ]?\\d[ABD-HJLN-UW-Z]{2}","jo":"\\d{5}","jp":"\\d{3}-\\d{4}","ke":"\\d{5}","kg":"\\d{6}","kh":"\\d{5}","kr":"\\d{3}[\\-]\\d{3}","kw":"\\d{5}","kz":"\\d{6}","la":"\\d{5}","lb":"(\\d{4}([ ]?\\d{4})?)?","li":"(948[5-9])|(949[0-7])","lk":"\\d{5}","lr":"\\d{4}","ls":"\\d{3}","lt":"\\d{5}","lu":"\\d{4}","lv":"\\d{4}","ma":"\\d{5}","mc":"980\\d{2}","md":"\\d{4}","me":"8\\d{4}","mg":"\\d{3}","mh":"969[67]\\d([ \\-]\\d{4})?","mk":"\\d{4}","mn":"\\d{6}","mp":"9695[012]([ \\-]\\d{4})?","mq":"9[78]2\\d{2}","mt":"[A-Z]{3}[ ]?\\d{2,4}","mu":"(\\d{3}[A-Z]{2}\\d{3})?","mv":"\\d{5}","mx":"\\d{5}","my":"\\d{5}","nc":"988\\d{2}","ne":"\\d{4}","nf":"2899","ng":"(\\d{6})?","ni":"((\\d{4}-)?\\d{3}-\\d{3}(-\\d{1})?)?","nl":"\\d{4}[ ]?[A-Z]{2}","no":"\\d{4}","np":"\\d{5}","nz":"\\d{4}","om":"(PC )?\\d{3}","pf":"987\\d{2}","pg":"\\d{3}","ph":"\\d{4}","pk":"\\d{5}","pl":"\\d{2}-\\d{3}","pm":"9[78]5\\d{2}","pn":"PCRN 1ZZ","pr":"00[679]\\d{2}([ \\-]\\d{4})?","pt":"\\d{4}([\\-]\\d{3})?","pw":"96940","py":"\\d{4}","re":"9[78]4\\d{2}","ro":"\\d{6}","rs":"\\d{6}","ru":"\\d{6}","sa":"\\d{5}","se":"\\d{3}[ ]?\\d{2}","sg":"\\d{6}","sh":"(ASCN|STHL) 1ZZ","si":"\\d{4}","sj":"\\d{4}","sk":"\\d{3}[ ]?\\d{2}","sm":"4789\\d","sn":"\\d{5}","so":"\\d{5}","sz":"[HLMS]\\d{3}","tc":"TKCA 1ZZ","th":"\\d{5}","tj":"\\d{6}","tm":"\\d{6}","tn":"\\d{4}","tr":"\\d{5}","tw":"\\d{3}(\\d{2})?","ua":"\\d{5}","us":"\\d{5}([ \\-]\\d{4})?","uy":"\\d{5}","uz":"\\d{6}","va":"00120","ve":"\\d{4}","vi":"008(([0-4]\\d)|(5[01]))([ \\-]\\d{4})?","wf":"986\\d{2}","yt":"976\\d{2}","yu":"\\d{5}","za":"\\d{4}","zm":"\\d{5}"};
+
+    find_regex = function(territory) {
+      var regex_str;
+      regex_str = postal_codes[territory];
+      if (regex_str != null) {
+        return regex_str;
+      } else {
+        return null;
+      }
+    };
+
+    PostalCodes.territories = function() {
+      var data, _;
+      return this.codes || (this.codes = (function() {
+        var _results;
+        _results = [];
+        for (data in postal_codes) {
+          _ = postal_codes[data];
+          _results.push(data);
+        }
+        return _results;
+      })());
+    };
+
+    PostalCodes.regex_for_territory = function(territory) {
+      var regex;
+      regex = find_regex(territory);
+      if (regex != null) {
+        return new RegExp(regex);
+      } else {
+        return null;
+      }
+    };
+
+    PostalCodes.is_valid = function(territory, postal_code) {
+      var regex;
+      regex = this.regex_for_territory(territory);
+      return regex.test(postal_code);
+    };
+
+    return PostalCodes;
+
+  })();
+
+  TwitterCldr.Languages = (function() {
+    var rtl_data;
+
+    function Languages() {}
+
+    Languages.all = {"aa":"אפארית","ab":"אבחזית","ace":"אכינזית","ach":"אקולי","ada":"אדנמה","ady":"אדיגית","ae":"אבסטן","af":"אפריקאנס","afa":"שפה אפרו-אסייתית","afh":"אפריהילי","agq":"אהיים","ain":"אינו","ak":"אקאן","akk":"אכדית","ale":"אלאוט","alg":"השפה האלגונקוויאנית","alt":"אלטאי דרומית","am":"אמהרית","an":"אראגונית","ang":"אנגלית עתיקה","anp":"אנג'יקה","apa":"שפה אפאצ׳ית","ar":"ערבית","ar-001":"Modern Standard Arabic","arc":"ארמית","arn":"אראוקנית","arp":"ארפהו","art":"שפה מלאכותית","arw":"ארוואק","as":"אסאמית","asa":"אסו","ast":"אסטורית","ath":"השפה האת'פסקנית","aus":"שפה אוסטרלית","av":"אבארית","awa":"אוואדית","ay":"איימארית","az":"אזרית","ba":"בשקירית","bad":"בנדה","bai":"השפה הבאמילקית","bal":"באלוצ׳י","ban":"בלינזית","bas":"בסאא","bat":"שפות בלטיות","bax":"באקס","bbj":"גומל","be":"בלארוסית","bej":"בז׳ה","bem":"במבה","ber":"ברברית","bez":"בנה","bfd":"באפוט","bg":"בולגרית","bh":"ביהארי","bho":"בוג'פורי","bi":"ביסלמה","bik":"ביקול","bin":"ביני","bkm":"קום","bla":"סיקסיקה","bm":"במבארה","bn":"בנגלית","bnt":"בנטו","bo":"טיבטית","br":"ברטונית","bra":"בראג'","brx":"בודו","bs":"בוסנית","bss":"אקוסה","btk":"בטאק","bua":"בוריאט","bug":"בוגינזית","bum":"בולו","byn":"בלין","byv":"מדומבה","ca":"קטלאנית","cad":"קאדו","cai":"שפה אינדיאנית מרכז-אמריקאית","car":"קאריב","cau":"שפה קווקזית","cay":"קאיוגה","cch":"אטסם","ce":"צ׳צ׳נית","ceb":"קבואנו","cel":"שפה קלטית","cgg":"צ'יגה","ch":"צ'מורו","chb":"צ'יבצ'ה","chg":"צ׳אגאטאי","chk":"צ'וקסה","chm":"מארי","chn":"ניב צ'ינוק","cho":"צ'וקטאו","chp":"צ'יפוויאן","chr":"צ׳רוקי","chy":"שאיין","ckb":"כורדית סוראנית","cmc":"השפה הצ'אמית","co":"קורסיקנית","cop":"קופטית","cpe":"קריאולית או פידג'ין מבוססת אנגלית","cpf":"קריאולית או פידג'ין מבוססת-צרפתית","cpp":"קריאולית או פידג'ין מבוססת-פורטוגזית","cr":"קרי","crh":"טטרית של קרים","crp":"שפה קראולית או פידג׳אנית","cs":"צ׳כית","csb":"קשוביאן","cu":"סלאבית כנסייתית עתיקה","cus":"השפה הקושיטית","cv":"צ'ובאש","cy":"וולשית","da":"דנית","dak":"דקוטה","dar":"דרגווה","dav":"טאיטה","day":"דיאק","de":"גרמנית","de-AT":"גרמנית אוסטרית","de-CH":"גרמנית שוויצרית (גבוהה)","del":"דלאוור","den":"סלאבית","dgr":"דוגריב","din":"דינקה","dje":"זארמה","doi":"דוגרי","dra":"השפה הדראווידיאנית","dsb":"סורביאן נמוכה","dua":"דואלה","dum":"הולנדית תיכונה","dv":"דיבהי","dyo":"הולה-פוניי","dyu":"דיולה","dz":"דזונקה","dzg":"דזאנגה","ebu":"אמבו","ee":"אווה","efi":"אפיק","egy":"מצרית עתיקה","eka":"אקיוק","el":"יוונית","elx":"עילמית","en":"אנגלית","en-AU":"אנגלית אוסטרלית","en-CA":"אנגלית קנדית","en-GB":"אנגלית בריטית","en-US":"אנגלית אמריקנית","enm":"אנגלית תיכונה","eo":"אספרנטו","es":"ספרדית","es-419":"ספרדית לטינו־אמריקאית","es-ES":"ספרדית אירופאית","et":"אסטונית","eu":"בסקית","ewo":"אוונדו","fa":"פרסית","fan":"פנג","fat":"פאנטי","ff":"פולה","fi":"פינית","fil":"פיליפינית","fiu":"השפה הפינו-אוגרית","fj":"פיג׳ית","fo":"פארואזית","fon":"פון","fr":"צרפתית","fr-CA":"צרפתית קנדית","fr-CH":"צרפתית שוויצרית","frm":"צרפתית תיכונה","fro":"צרפתית עתיקה","frr":"פריזית צפונית","frs":"פריזיאן מזרחית","fur":"פריולית","fy":"פריזית","ga":"אירית","gaa":"גא","gay":"גאיו","gba":"גבאיה","gd":"גאלית סקוטית","gem":"שפה גרמאנית","gez":"געז","gil":"גילברטזית","gl":"גליציאנית","gmh":"גרמנית בינונית-גבוהה","gn":"גוארני","goh":"גרמנית עתיקה גבוהה","gon":"גונדי","gor":"גורונטאלו","got":"גותית","grb":"גרבו","grc":"יוונית עתיקה","gsw":"גרמנית שוויצרית","gu":"גוג׳ראטית","guz":"גוסי","gv":"מאנית","gwi":"גוויצ'ין","ha":"האוסה","hai":"האידה","haw":"הוואית","he":"עברית","hi":"הינדי","hil":"היליגאינון","him":"הימצ'אלי","hit":"חיתית","hmn":"מונג","ho":"הארי מוטו","hr":"קרואטית","hsb":"סורביאנית עליונה","ht":"האיטית","hu":"הונגרית","hup":"הופה","hy":"ארמנית","hz":"הררו","ia":"‏אינטרלינגואה","iba":"איבאן","ibb":"איביביו","id":"אינדונזית","ie":"אינטרלינגה","ig":"איגבו","ii":"סיצ'ואן יי","ijo":"איג'ו","ik":"אינופיאק","ilo":"אילוקו","inc":"שפת האינדיק","ine":"שפה הודו-אירופית","inh":"אינגושית","io":"אידו","ira":"שפה איראנית","iro":"השפה האירוקואונית","is":"איסלנדית","it":"איטלקית","iu":"אינוקטיטוט","ja":"יפנית","jbo":"לויבאן","jgo":"Ngomba","jmc":"מצ'אמה","jpr":"פרסית יהודית","jrb":"ערבית יהודית","jv":"יאוונית","ka":"גאורגית","kaa":"קארא-קלפאק","kab":"קבילה","kac":"קצ'ין","kaj":"ג'יו","kam":"קמבה","kar":"קארן","kaw":"קאווי","kbd":"קברדית","kbl":"קנמבו","kcg":"טיאפ","kde":"מקונדה","kea":"קאבוורדיאנו","kfo":"קורו","kg":"קונגו","kha":"קאסי","khi":"השפה הקויסאנית","kho":"קוטאנזית","khq":"קוירה צ'יני","ki":"קיקויו","kj":"קואניאמה","kk":"קזחית","kkj":"קאקו","kl":"קאלאליסוטית","kln":"קאלנג'ין","km":"קמרית","kmb":"קימבונדו","kn":"קנאדה","ko":"קוריאנית","kok":"קונקאני","kos":"קוסראיאן","kpe":"קפלה","kr":"קאנורי","krc":"קראצ'י-בלקר","krl":"קארלית","kro":"קרו","kru":"קורוק","ks":"קשמירית","ksb":"שמבאלה","ksf":"באפיה","ksh":"קולוניאן","ku":"כורדית","kum":"קומיק","kut":"קוטנאי","kv":"קומי","kw":"קורנית","ky":"קירגיזית","la":"לטינית","lad":"לדינו","lag":"לאנגי","lah":"לנדה","lam":"למבה","lb":"לוקסמבורגית","lez":"לזגית","lg":"גאנדה","li":"לימבורגיש","lkt":"Lakota","ln":"לינגלה","lo":"לאית","lol":"מונגו","loz":"לוזי","lt":"ליטאית","lu":"לובה-קטנגה","lua":"לובה-לולואה","lui":"לואיסנו","lun":"לונדה","luo":"לואו","lus":"לושאי","luy":"לויה","lv":"לטבית","mad":"מדורסה","maf":"מאפא","mag":"מאגאהית","mai":"מאיטילית","mak":"מקסאר","man":"מנדינגו","map":"אוסטרונזית","mas":"מאסאית","mde":"מאבא","mdf":"מוקשה","mdr":"מנדאר","men":"מנדה","mer":"מרו","mfe":"מוריסיין","mg":"מלגשית","mga":"אירית תיכונה","mgh":"מקואה-מיטו","mgo":"Meta'","mh":"מרשאלס","mi":"מאורית","mic":"מיקמק","min":"מיננגקבאו","mis":"שפה אחרת","mk":"מקדונית","mkh":"שפת מון-חמר","ml":"מלאיאלם","mn":"מונגולית","mnc":"מנצ'ו","mni":"מניפורית","mno":"שפת מנובו","mo":"מולדבית","moh":"מוהוק","mos":"מוסי","mr":"מרטהי","ms":"מלאית","mt":"מלטית","mua":"מונדאנג","mul":"מספר שפות","mun":"שפת מונדה","mus":"קריק","mwl":"מירנדזית","mwr":"מרווארי","my":"בורמזית","mye":"מאיין","myn":"מאיה","myv":"ארזיה","na":"נאורית","nah":"נאהואטל","nai":"שפה אינדיאנית צפון-אמריקאית","nap":"נפוליטנית","naq":"נאמה","nb":"‏נורבגית ספרותית","nd":"צפון נדבלה","nds":"גרמנית תחתית","ne":"נפאלית","new":"נווארי","ng":"נדונגה","nia":"ניאס","nic":"השפה הניגר-קורדופניאנית","niu":"ניואיאן","nl":"הולנדית","nl-BE":"פלמית","nmg":"קוואסיו","nn":"נורבגית חדשה","nnh":"נגיאמבון","no":"נורבגית","nog":"נוגאי","non":"‏נורדית עתיקה","nqo":"נ'קו","nr":"דרום נדבלה","nso":"סוטו הצפונית","nub":"שפות נבטיות","nus":"נואר","nv":"נבחו","nwc":"נווארית קלאסית","ny":"ניאנג'ה","nym":"ניאמווזי","nyn":"ניאנקולה","nyo":"ניורו","nzi":"נזימה","oc":"אוקסיטנית","oj":"אוג'יבווה","om":"אורומו","or":"אוריה","os":"אוסטית","osa":"אוסג'ה","ota":"טורקית עותומנית","oto":"השפה האוטומיאנית","pa":"פנג׳אבית","paa":"השפה הפפואנית","pag":"פנגסינאן","pal":"פלאבי","pam":"פמפאניה","pap":"פפיאמנטו","pau":"פלוואן","peo":"פרסית עתיקה","phi":"שפה פיליפינית","phn":"פניקית","pi":"פאלי","pl":"פולנית","pon":"פונפיאן","pra":"שפת פרקריט","pro":"פרובנסאל עתיקה","ps":"פושטו","pt":"פורטוגזית","pt-BR":"פורטוגזית ברזילאית","pt-PT":"פורטוגזית אירופאית","qu":"קצ'ואה","raj":"ראג׳סטן","rap":"רפאנוי","rar":"ררוטונגאן","rm":"רומאנש","rn":"קירונדי","ro":"רומנית","roa":"שפת רומאנס","rof":"רומבו","rom":"רומאנית","root":"רוט","ru":"רוסית","rup":"ארומנית","rw":"קינירואנדה","rwk":"רווא","sa":"סנסקריט","sad":"סנדאווה","sah":"סאחה","sai":"שפה אינדיאנית דרום אמריקאית","sal":"השפה הסלישאנית","sam":"ארמית שומרונית","saq":"סמבורו","sas":"ססאק","sat":"סאנטלי","sba":"נגמבאי","sbp":"סאנגו","sc":"סרדינית","scn":"סיציליאנית","sco":"סקוטית","sd":"סינדהית","se":"לאפית צפונית","see":"סנקה","seh":"סנה","sel":"סלקופ","sem":"שפה שמית","ses":"קויראבורו סני","sg":"סנגו","sga":"אירית עתיקה","sgn":"שפת סימנים","sh":"סרבו-קרואטית","shi":"טצ'להיט","shn":"שאן","shu":"ערבית צ'אדית","si":"סינהלה","sid":"סידמו","sio":"שפת סו","sit":"שפה סינו־טיבטית","sk":"סלובקית","sl":"סלובנית","sla":"שפה סלאבית","sm":"סמואית","sma":"סאמי דרומית","smi":"שפת סאמי","smj":"לולה סאמי","smn":"אינארי סאמי","sms":"סקולט סאמי","sn":"שונה","snk":"סונינקה","so":"סומלית","sog":"סוגדיאן","son":"סונגהאי","sq":"אלבנית","sr":"סרבית","srn":"סרנאן טונגו","srr":"סרר","ss":"סיסוואטי","ssa":"השפה הנילו-סהרנית","ssy":"סאהו","st":"ססות׳ו","su":"סודנית","suk":"סוקומה","sus":"סוסו","sux":"שומרית","sv":"שוודית","sw":"סווהילית","swb":"קומורו","swc":"קונגו סוואהילי","syc":"סירית קלאסית","syr":"סורית","ta":"טמילית","tai":"שפת טאי","te":"טלוגו","tem":"טימנה","teo":"טסו","ter":"טרנו","tet":"טטום","tg":"טג׳יקית","th":"תאי","ti":"טיגרינאית","tig":"טיגרית","tiv":"טיב","tk":"טורקמנית","tkl":"טוקלאו","tl":"טגלוג","tlh":"קלינגון","tli":"טלינגיט","tmh":"טמאשק","tn":"טוניסיה","to":"טונגן","tog":"ניאסה טונגה","tpi":"טוק פיסין","tr":"טורקית","trv":"טרוקו","ts":"טסונגה","tsi":"טסימשיאן","tt":"טטרית","tum":"טומבוקה","tup":"שפת טופי","tut":"השפה האלטאית","tvl":"טובאלו","tw":"טווי","twq":"טסוואק","ty":"טהיטית","tyv":"טובינית","tzm":"טמזייט של מרכז מרוקו","udm":"אודמורט","ug":"אויגור","uga":"אוגריתית","uk":"אוקראינית","umb":"אומבונדו","und":"שפה לא ידועה","ur":"אורדו","uz":"אוזבקית","vai":"ואי","ve":"וונדה","vi":"ויאטנמית","vo":"‏וולאפיק","vot":"ווטיק","vun":"וונג'ו","wa":"וואלון","wae":"וואלסר","wak":"שפת ווקשאן","wal":"וולאמו","war":"ווראי","was":"וואשו","wen":"השפה הסורבית","wo":"ג׳ולוף","xal":"קלמיק","xh":"קסוסה","xog":"סוגה","yao":"יאו","yap":"יאפזית","yav":"יאנגבן","ybb":"ימבה","yi":"יידיש","yo":"יורובה","ypk":"השפה היופית","yue":"קנטונזית","za":"ז'ואנג","zap":"זאפוטק","zbl":"בליסימבולס","zen":"זנאגה","zh":"סינית","zh-Hans":"סינית (מפושטת)","zh-Hant":"סינית מסורתית","znd":"זאנדה","zu":"זולו","zun":"זוני","zxx":"ללא תוכן לשוני","zza":"זאזא"};
+
+    rtl_data = {"af":false,"ar":true,"be":false,"bg":false,"bn":false,"ca":false,"cs":false,"cy":false,"da":false,"de":false,"el":false,"en":false,"en-GB":false,"es":false,"eu":false,"fa":true,"fi":false,"fil":false,"fr":false,"ga":false,"gl":false,"he":true,"hi":false,"hr":false,"hu":false,"id":false,"is":false,"it":false,"ja":false,"ko":false,"lv":false,"ms":false,"nb":false,"nl":false,"pl":false,"pt":false,"ro":false,"ru":false,"sk":false,"sq":false,"sr":false,"sv":false,"ta":false,"th":false,"tr":false,"uk":false,"ur":true,"vi":false,"zh":false,"zh-Hant":false};
+
+    Languages.from_code = function(code) {
+      return this.all[code] || null;
+    };
+
+    Languages.is_rtl = function(locale) {
+      var result;
+      result = rtl_data[locale];
+      if (result != null) {
+        return result;
+      } else {
+        return null;
+      }
+    };
+
+    return Languages;
 
   })();
 

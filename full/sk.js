@@ -24,6 +24,8 @@
 
   TwitterCldr.is_rtl = false;
 
+  TwitterCldr.locale = "sk";
+
   TwitterCldr.Utilities = (function() {
     function Utilities() {}
 
@@ -571,7 +573,7 @@
     DateTimeFormatter.prototype.timezone = function(time, pattern, length) {
       var hours, minutes, offset, offsetString, sign;
       offset = time.getTimezoneOffset();
-      hours = ("00" + (Math.abs(offset) / 60).toString()).slice(-2);
+      hours = ("00" + (Math.floor(Math.abs(offset) / 60)).toString()).slice(-2);
       minutes = ("00" + (Math.abs(offset) % 60).toString()).slice(-2);
       sign = offset > 0 ? "-" : "+";
       offsetString = sign + hours + ":" + minutes;
@@ -746,7 +748,7 @@
     }
 
     NumberFormatter.prototype.format = function(number, options) {
-      var fraction, fraction_format, integer_format, intg, key, opts, prefix, result, sign, suffix, val, _ref, _ref1;
+      var fraction, fraction_format, integer_format, intg, key, opts, prefix, result, sign, suffix, tokens, val, _ref, _ref1;
       if (options == null) {
         options = {};
       }
@@ -755,18 +757,23 @@
         val = options[key];
         opts[key] = options[key] != null ? options[key] : opts[key];
       }
-      _ref = this.partition_tokens(this.get_tokens(number, opts)), prefix = _ref[0], suffix = _ref[1], integer_format = _ref[2], fraction_format = _ref[3];
-      number = this.transform_number(number);
-      _ref1 = this.parse_number(number, opts), intg = _ref1[0], fraction = _ref1[1];
-      result = integer_format.apply(parseFloat(intg), opts);
-      if (fraction) {
-        result += fraction_format.apply(fraction, opts);
+      tokens = this.get_tokens(number, opts);
+      if (tokens.join('') === '0') {
+        return number.toString();
+      } else {
+        _ref = this.partition_tokens(tokens), prefix = _ref[0], suffix = _ref[1], integer_format = _ref[2], fraction_format = _ref[3];
+        number = this.truncate_number(number, integer_format);
+        _ref1 = this.parse_number(number, opts), intg = _ref1[0], fraction = _ref1[1];
+        result = integer_format.apply(parseFloat(intg), opts);
+        if (fraction) {
+          result += fraction_format.apply(fraction, opts);
+        }
+        sign = number < 0 && prefix !== "-" ? this.symbols.minus_sign || this.default_symbols.minus_sign : "";
+        return "" + prefix + result + suffix;
       }
-      sign = number < 0 && prefix !== "-" ? this.symbols.minus_sign || this.default_symbols.minus_sign : "";
-      return "" + prefix + result + suffix;
     };
 
-    NumberFormatter.prototype.transform_number = function(number) {
+    NumberFormatter.prototype.truncate_number = function(number, integer_format) {
       return number;
     };
 
@@ -1001,12 +1008,11 @@
       return tokens;
     };
 
-    AbbreviatedNumberFormatter.prototype.transform_number = function(number) {
-      var factor, power;
-      if ((number < this.NUMBER_MAX) && (number >= this.NUMBER_MIN)) {
-        power = Math.floor((number.toString().length - 1) / 3) * 3;
-        factor = Math.pow(10, power);
-        return number / factor;
+    AbbreviatedNumberFormatter.prototype.truncate_number = function(number, integer_format) {
+      var factor;
+      if (this.NUMBER_MIN <= number && number < this.NUMBER_MAX) {
+        factor = Math.max(0, Math.floor(number).toString().length - integer_format.format.length);
+        return number / Math.pow(10, factor);
       } else {
         return number;
       }
@@ -1813,20 +1819,93 @@
     };
 
     PhoneCodes.code_for_territory = function(territory) {
-      var phone_code, result, territory_code, _ref;
-      result = null;
-      _ref = this.phone_codes;
-      for (territory_code in _ref) {
-        phone_code = _ref[territory_code];
-        if (territory_code === territory) {
-          result = phone_code;
-          break;
-        }
+      var result;
+      result = this.phone_codes[territory];
+      if (result != null) {
+        return result;
+      } else {
+        return null;
       }
-      return result;
     };
 
     return PhoneCodes;
+
+  })();
+
+  TwitterCldr.PostalCodes = (function() {
+    var find_regex, postal_codes;
+
+    function PostalCodes() {}
+
+    postal_codes = {"ad":"AD\\d{3}","am":"(37)?\\d{4}","ar":"([A-HJ-NP-Z])?\\d{4}([A-Z]{3})?","as":"96799","at":"\\d{4}","au":"\\d{4}","ax":"22\\d{3}","az":"\\d{4}","ba":"\\d{5}","bb":"(BB\\d{5})?","bd":"\\d{4}","be":"\\d{4}","bg":"\\d{4}","bh":"((1[0-2]|[2-9])\\d{2})?","bm":"[A-Z]{2}[ ]?[A-Z0-9]{2}","bn":"[A-Z]{2}[ ]?\\d{4}","br":"\\d{5}[\\-]?\\d{3}","by":"\\d{6}","ca":"[ABCEGHJKLMNPRSTVXY]\\d[ABCEGHJ-NPRSTV-Z][ ]?\\d[ABCEGHJ-NPRSTV-Z]\\d","cc":"6799","ch":"\\d{4}","ck":"\\d{4}","cl":"\\d{7}","cn":"\\d{6}","cr":"\\d{4,5}|\\d{3}-\\d{4}","cs":"\\d{5}","cv":"\\d{4}","cx":"6798","cy":"\\d{4}","cz":"\\d{3}[ ]?\\d{2}","de":"\\d{5}","dk":"\\d{4}","do":"\\d{5}","dz":"\\d{5}","ec":"([A-Z]\\d{4}[A-Z]|(?:[A-Z]{2})?\\d{6})?","ee":"\\d{5}","eg":"\\d{5}","es":"\\d{5}","et":"\\d{4}","fi":"\\d{5}","fk":"FIQQ 1ZZ","fm":"(9694[1-4])([ \\-]\\d{4})?","fo":"\\d{3}","fr":"\\d{2}[ ]?\\d{3}","gb":"GIR[ ]?0AA|((AB|AL|B|BA|BB|BD|BH|BL|BN|BR|BS|BT|CA|CB|CF|CH|CM|CO|CR|CT|CV|CW|DA|DD|DE|DG|DH|DL|DN|DT|DY|E|EC|EH|EN|EX|FK|FY|G|GL|GY|GU|HA|HD|HG|HP|HR|HS|HU|HX|IG|IM|IP|IV|JE|KA|KT|KW|KY|L|LA|LD|LE|LL|LN|LS|LU|M|ME|MK|ML|N|NE|NG|NN|NP|NR|NW|OL|OX|PA|PE|PH|PL|PO|PR|RG|RH|RM|S|SA|SE|SG|SK|SL|SM|SN|SO|SP|SR|SS|ST|SW|SY|TA|TD|TF|TN|TQ|TR|TS|TW|UB|W|WA|WC|WD|WF|WN|WR|WS|WV|YO|ZE)(\\d[\\dA-Z]?[ ]?\\d[ABD-HJLN-UW-Z]{2}))|BFPO[ ]?\\d{1,4}","ge":"\\d{4}","gf":"9[78]3\\d{2}","gg":"GY\\d[\\dA-Z]?[ ]?\\d[ABD-HJLN-UW-Z]{2}","gl":"39\\d{2}","gn":"\\d{3}","gp":"9[78][01]\\d{2}","gr":"\\d{3}[ ]?\\d{2}","gs":"SIQQ 1ZZ","gt":"\\d{5}","gu":"969[123]\\d([ \\-]\\d{4})?","gw":"\\d{4}","hm":"\\d{4}","hn":"(?:\\d{5})?","hr":"\\d{5}","ht":"\\d{4}","hu":"\\d{4}","id":"\\d{5}","ie":"((D|DUBLIN)?([1-9]|6[wW]|1[0-8]|2[024]))?","il":"\\d{5}","im":"IM\\d[\\dA-Z]?[ ]?\\d[ABD-HJLN-UW-Z]{2}","in":"\\d{6}","io":"BBND 1ZZ","iq":"\\d{5}","is":"\\d{3}","it":"\\d{5}","je":"JE\\d[\\dA-Z]?[ ]?\\d[ABD-HJLN-UW-Z]{2}","jo":"\\d{5}","jp":"\\d{3}-\\d{4}","ke":"\\d{5}","kg":"\\d{6}","kh":"\\d{5}","kr":"\\d{3}[\\-]\\d{3}","kw":"\\d{5}","kz":"\\d{6}","la":"\\d{5}","lb":"(\\d{4}([ ]?\\d{4})?)?","li":"(948[5-9])|(949[0-7])","lk":"\\d{5}","lr":"\\d{4}","ls":"\\d{3}","lt":"\\d{5}","lu":"\\d{4}","lv":"\\d{4}","ma":"\\d{5}","mc":"980\\d{2}","md":"\\d{4}","me":"8\\d{4}","mg":"\\d{3}","mh":"969[67]\\d([ \\-]\\d{4})?","mk":"\\d{4}","mn":"\\d{6}","mp":"9695[012]([ \\-]\\d{4})?","mq":"9[78]2\\d{2}","mt":"[A-Z]{3}[ ]?\\d{2,4}","mu":"(\\d{3}[A-Z]{2}\\d{3})?","mv":"\\d{5}","mx":"\\d{5}","my":"\\d{5}","nc":"988\\d{2}","ne":"\\d{4}","nf":"2899","ng":"(\\d{6})?","ni":"((\\d{4}-)?\\d{3}-\\d{3}(-\\d{1})?)?","nl":"\\d{4}[ ]?[A-Z]{2}","no":"\\d{4}","np":"\\d{5}","nz":"\\d{4}","om":"(PC )?\\d{3}","pf":"987\\d{2}","pg":"\\d{3}","ph":"\\d{4}","pk":"\\d{5}","pl":"\\d{2}-\\d{3}","pm":"9[78]5\\d{2}","pn":"PCRN 1ZZ","pr":"00[679]\\d{2}([ \\-]\\d{4})?","pt":"\\d{4}([\\-]\\d{3})?","pw":"96940","py":"\\d{4}","re":"9[78]4\\d{2}","ro":"\\d{6}","rs":"\\d{6}","ru":"\\d{6}","sa":"\\d{5}","se":"\\d{3}[ ]?\\d{2}","sg":"\\d{6}","sh":"(ASCN|STHL) 1ZZ","si":"\\d{4}","sj":"\\d{4}","sk":"\\d{3}[ ]?\\d{2}","sm":"4789\\d","sn":"\\d{5}","so":"\\d{5}","sz":"[HLMS]\\d{3}","tc":"TKCA 1ZZ","th":"\\d{5}","tj":"\\d{6}","tm":"\\d{6}","tn":"\\d{4}","tr":"\\d{5}","tw":"\\d{3}(\\d{2})?","ua":"\\d{5}","us":"\\d{5}([ \\-]\\d{4})?","uy":"\\d{5}","uz":"\\d{6}","va":"00120","ve":"\\d{4}","vi":"008(([0-4]\\d)|(5[01]))([ \\-]\\d{4})?","wf":"986\\d{2}","yt":"976\\d{2}","yu":"\\d{5}","za":"\\d{4}","zm":"\\d{5}"};
+
+    find_regex = function(territory) {
+      var regex_str;
+      regex_str = postal_codes[territory];
+      if (regex_str != null) {
+        return regex_str;
+      } else {
+        return null;
+      }
+    };
+
+    PostalCodes.territories = function() {
+      var data, _;
+      return this.codes || (this.codes = (function() {
+        var _results;
+        _results = [];
+        for (data in postal_codes) {
+          _ = postal_codes[data];
+          _results.push(data);
+        }
+        return _results;
+      })());
+    };
+
+    PostalCodes.regex_for_territory = function(territory) {
+      var regex;
+      regex = find_regex(territory);
+      if (regex != null) {
+        return new RegExp(regex);
+      } else {
+        return null;
+      }
+    };
+
+    PostalCodes.is_valid = function(territory, postal_code) {
+      var regex;
+      regex = this.regex_for_territory(territory);
+      return regex.test(postal_code);
+    };
+
+    return PostalCodes;
+
+  })();
+
+  TwitterCldr.Languages = (function() {
+    var rtl_data;
+
+    function Languages() {}
+
+    Languages.all = {"aa":"afarčina","ab":"abcházština","ace":"acehčina","ach":"ačoli","ada":"adangme","ady":"adygčina","ae":"avestčina","af":"afrikánčina","afa":"afroázijské jazyky","afh":"afrihili","agq":"aghem","ain":"ainčina","ak":"akančina","akk":"akkadčina","ale":"aleutčina","alg":"algonkinské jazyky","alt":"južná altajčina","am":"amharčina","an":"aragónčina","ang":"stará angličtina","anp":"angika","apa":"apačské jazyky","ar":"arabčina","ar-001":"Modern Standard Arabic","arc":"aramejčina","arn":"araukánčina","arp":"arapaho","art":"umelý jazyk","arw":"arawačtina","as":"ásámčina","asa":"asu","ast":"astúrčina","ath":"athabaské jazyky","aus":"austrálske jazyky","av":"avarčina","awa":"avadhčina","ay":"aymarčina","az":"azerčina","ba":"baskirčina","bad":"banda","bai":"bamileke","bal":"balúčtina","ban":"balijčina","bas":"basa","bat":"baltské jazyky","bax":"bamun","bbj":"ghomala","be":"bieloruština","bej":"bedža","bem":"bemba","ber":"berberské jazyky","bez":"bena","bfd":"bafut","bg":"bulharčina","bh":"bihárske jazyky","bho":"bhódžpurčina","bi":"bislama","bik":"bikol","bin":"bini","bkm":"kom","bla":"siksika","bm":"bambarčina","bn":"bengálčina","bnt":"bantuské jazyky","bo":"tibetčina","br":"bretónčina","bra":"bradžčina","brx":"bodo","bs":"bosniačtina","bss":"akoose","btk":"batacké jazyky","bua":"buriatčina","bug":"bugiština","bum":"bulu","byn":"blin","byv":"medumba","ca":"katalánčina","cad":"kaddo","cai":"jazyk stredoamerických indiánov","car":"karibský","cau":"kaukazské jazyky","cay":"cayuga","cch":"atsam","ce":"čečenčina","ceb":"cebuánčina","cel":"keltské jazyky","cgg":"čiga","ch":"čamorčina","chb":"čibča","chg":"čagatajčina","chk":"truk","chm":"marijčina","chn":"činucký žargón","cho":"čoktavčina","chp":"čipevajčina","chr":"čerokí","chy":"čejenčina","ckb":"kurdčina (sorání)","cmc":"čamaské jazyky","co":"korzičtina","cop":"koptčina","cpe":"anglická kreolčina alebo pidžin","cpf":"francúzska kreolčina alebo pidžin","cpp":"portugalská kreolčina alebo pidžin","cr":"krí","crh":"krymská turečtina","crp":"kreolčina alebo pidžin","cs":"čeština","csb":"kašubčina","cu":"cirkevná slovančina","cus":"kušitské jazyky","cv":"čuvaština","cy":"waleština","da":"dánčina","dak":"dakotčina","dar":"darginčina","dav":"taita","day":"dajačtina","de":"nemčina","de-AT":"rakúska nemčina","de-CH":"švajčiarska spisovná nemčina","del":"delawarčina","den":"slovančina","dgr":"dogribčina","din":"dinka","dje":"zarma","doi":"dógrí","dra":"drávidské jazyky","dsb":"dolnolužická srbčina","dua":"duala","dum":"stredná holandčina","dv":"divehi","dyo":"jola-fonyi","dyu":"ďula","dz":"dzongkä","dzg":"dazaga","ebu":"embu","ee":"eweština","efi":"efik","egy":"staroegyptský","eka":"ekadžuk","el":"gréčtina","elx":"elamčina","en":"angličtina","en-AU":"austrálska angličtina","en-CA":"kanadská angličtina","en-GB":"britská angličtina","en-US":"americká angličtina","enm":"stredná angličtina","eo":"esperanto","es":"španielčina","es-419":"latinskoamerická španielčina","es-ES":"iberská španielčina","et":"estónčina","eu":"baskičtina","ewo":"ewondo","fa":"perzština","fan":"fangčina","fat":"fanti","ff":"fulbčina","fi":"fínčina","fil":"filipínčina","fiu":"ugrofínske jazyky","fj":"fidžijčina","fo":"faerčina","fon":"fončina","fr":"francúzština","fr-CA":"kanadská francúzština","fr-CH":"švajčiarska francúzština","frm":"stredná francúzština","fro":"stará francúzština","frr":"severná frízština","frs":"východná frízština","fur":"friulčina","fy":"západná frízština","ga":"írčina","gaa":"ga","gay":"gayo","gba":"gbaja","gd":"škótska gaelčina","gem":"germánske jazyky","gez":"etiópčina","gil":"kiribatčina","gl":"galícijčina","gmh":"stredná horná nemčina","gn":"guaraní","goh":"stará horná nemčina","gon":"góndčina","gor":"gorontalo","got":"gótčina","grb":"grebo","grc":"starogréčtina","gsw":"švajčiarska nemčina","gu":"gudžarátčina","guz":"gusii","gv":"mančina","gwi":"gwichʼin","ha":"hauština","hai":"haida","haw":"havajčina","he":"hebrejčina","hi":"hindčina","hil":"hiligajnončina","him":"himachali","hit":"chetitčina","hmn":"hmong","ho":"hiri motu","hr":"chorvátčina","hsb":"hornolužická srbčina","ht":"haitčina","hu":"maďarčina","hup":"hupčina","hy":"arménčina","hz":"herero","ia":"interlingua","iba":"ibančina","ibb":"ibibio","id":"indonézština","ie":"interlingue","ig":"igboština","ii":"s’čchuanská ioština","ijo":"idžo","ik":"inupiaq","ilo":"ilokánčina","inc":"indické jazyky","ine":"indoeurópske jazyky","inh":"inguština","io":"ido","ira":"iránske jazyky","iro":"irokézske jazyky","is":"islandčina","it":"taliančina","iu":"inuktitut","ja":"japončina","jbo":"lojban","jgo":"Ngomba","jmc":"machame","jpr":"židovská perzština","jrb":"židovská arabčina","jv":"jávčina","ka":"gruzínčina","kaa":"karakalpačtina","kab":"kabylčina","kac":"kačjinčina","kaj":"jju","kam":"kamba","kar":"karenčina","kaw":"kawi","kbd":"kabardčina","kbl":"kanembu","kcg":"tyap","kde":"makonde","kea":"kapverdčina","kfo":"koro","kg":"kongčina","kha":"khasijčina","khi":"kojsanské jazyky","kho":"chotančina","khq":"západná songhajčina","ki":"kikuju","kj":"kuaňama","kk":"kazaština","kkj":"kako","kl":"grónska eskimáčtina","kln":"kalenjin","km":"kambodžská khmérčina","kmb":"kimbundu","kn":"kannadčina","ko":"kórejčina","kok":"kónkánčina","kos":"kusaie","kpe":"kpelle","kr":"kanurijčina","krc":"karačajevsko-balkarský jazyk","krl":"karelčina","kro":"kru","kru":"kurukhčina","ks":"kašmírčina","ksb":"šambala","ksf":"bafia","ksh":"kolínčina","ku":"kurdčina","kum":"kumyčtina","kut":"kutenajčina","kv":"komijčina","kw":"kornčina","ky":"kirgizština","la":"latinčina","lad":"židovská španielčina","lag":"langi","lah":"lahandčina","lam":"lamba","lb":"luxemburčina","lez":"lezginčina","lg":"gandčina","li":"limburčina","lkt":"Lakota","ln":"lingalčina","lo":"laoština","lol":"mongo","loz":"lozi","lt":"litovčina","lu":"luba-katanga","lua":"luba-luluánčina","lui":"luiseňo","lun":"lunda","luo":"luo","lus":"mizorámčina","luy":"luyia","lv":"lotyština","mad":"madurčina","maf":"mafa","mag":"magadhčina","mai":"maithilčina","mak":"makasarčina","man":"mandingo","map":"austronézske jazyky","mas":"masajčina","mde":"maba","mdf":"mokšiančina","mdr":"mandarčina","men":"mendi","mer":"meru","mfe":"maurícijská kreolčina","mg":"malgaština","mga":"stredná írčina","mgh":"makhuwa-meetto","mgo":"Meta'","mh":"kajin-majol","mi":"maorijčina","mic":"mikmakčina","min":"minangkabaučina","mis":"rôznorodý jazyk","mk":"macedónčina","mkh":"mon-khmérsky jazyk","ml":"malajálamčina","mn":"mongolčina","mnc":"mandžuština","mni":"manípurčina","mno":"jazyk manobo","mo":"moldavčina","moh":"mohawk","mos":"mossi","mr":"maráthčina","ms":"malajčina","mt":"maltčina","mua":"mundang","mul":"viaceré jazyky","mun":"mundský jazyk","mus":"kríkčina","mwl":"mirandčina","mwr":"marawari","my":"barmčina","mye":"myene","myn":"mayské jazyky","myv":"erzjančina","na":"nauru","nah":"nahuaský jazyk","nai":"jazyk severoamerických indiánov","nap":"neapolčina","naq":"nama","nb":"nórsky bokmål","nd":"severné ndbele","nds":"dolná nemčina","ne":"nepálčina","new":"nevárčina","ng":"ndonga","nia":"niasánčina","nic":"nigersko-konžský jazyk","niu":"niueština","nl":"holandčina","nl-BE":"flámčina","nmg":"kwasio","nn":"nórsky nynorsk","nnh":"ngiemboon","no":"nórčina","nog":"nogajčina","non":"stará nórčina","nqo":"n’ko","nr":"južná ndebelčina","nso":"severná sothčina","nub":"núbijský jazyk","nus":"nuer","nv":"navajo","nwc":"klasická nevárčina","ny":"čewa","nym":"ňamwezi","nyn":"ňankole","nyo":"ňoro","nzi":"nzima","oc":"okcitánčina","oj":"odžibva","om":"oromčina","or":"uríjčina","os":"osetčina","osa":"osagčina","ota":"osmanská turečtina","oto":"oto-pameský jazyk","pa":"pandžábčina","paa":"papuánsky","pag":"pangasinančina","pal":"pahlaví","pam":"pampanga","pap":"papiamento","pau":"palaučina","peo":"stará perzština","phi":"filipínsky jazyk","phn":"feničtina","pi":"pálí","pl":"poľština","pon":"pohnpeičina","pra":"prakrity","pro":"stará okcitánčina","ps":"paštčina","pt":"portugalčina","pt-BR":"brazílska portugalčina","pt-PT":"iberská portugalčina","qu":"kečuánčina","raj":"radžastančina","rap":"rapanujčina","rar":"rarotongan","rm":"rétorománčina","rn":"rundčina","ro":"rumunčina","roa":"románsky jazyk","rof":"rombo","rom":"rómčina","root":"koreň","ru":"ruština","rup":"arumunčina","rw":"rwandčina","rwk":"rwa","sa":"sanskrit","sad":"sandawe","sah":"jakutčina","sai":"jazyk juhoamerických indiánov","sal":"sališský jazyk","sam":"samaritánska aramejčina","saq":"samburu","sas":"sasačtina","sat":"santalčina","sba":"ngambay","sbp":"sangu","sc":"sardínčina","scn":"sicílčina","sco":"škótčina","sd":"sindhčina","se":"severná saamčina","see":"seneca","seh":"sena","sel":"selkupčina","sem":"semitský jazyk","ses":"koyraboro senni","sg":"sango","sga":"stará írčina","sgn":"znaková reč","sh":"srbochorvátčina","shi":"tachelhit","shn":"šančina","shu":"čadská arabčina","si":"sinhalčina","sid":"sidamo","sio":"siouský jazyk","sit":"sinotibetský jazyk","sk":"slovenčina","sl":"slovinčina","sla":"slovenský jazyk","sm":"samojčina","sma":"južná saamčina","smi":"saamský jazyk","smj":"luleská saamčina","smn":"inariská saamčina","sms":"skolt","sn":"šončina","snk":"soninke","so":"somálčina","sog":"sogdijčina","son":"songhajčina","sq":"albánčina","sr":"srbčina","srn":"sranan","srr":"serer","ss":"svazijčina","ssa":"nilosaharský jazyk","ssy":"saho","st":"južná sothčina","su":"sundčina","suk":"sukuma","sus":"susu","sux":"sumerčina","sv":"švédčina","sw":"swahilčina","swb":"komorčina","swc":"konžská svahilčina","syc":"klasická sýrčina","syr":"sýrčina","ta":"tamilčina","tai":"thajský jazyk","te":"telugčina","tem":"temne","teo":"teso","ter":"tereno","tet":"tetum","tg":"tadžičtina","th":"thajčina","ti":"tigriňa","tig":"tigrejčina","tiv":"tiv","tk":"turkménčina","tkl":"tokelaučina","tl":"tagalčina","tlh":"klingónčina","tli":"tlingitčina","tmh":"tamašek","tn":"tswančina","to":"tongčina","tog":"ňasa tonga","tpi":"tok pisin","tr":"turečtina","trv":"taroko","ts":"tsonga","tsi":"tsimshijské jazyky","tt":"tatárčina","tum":"tumbuka","tup":"jazyk tupi","tut":"altajské jazyky","tvl":"tuvalčina","tw":"twi","twq":"tasawak","ty":"tahitčina","tyv":"tuviančina","tzm":"stredomarocká berberčina","udm":"udmurtčina","ug":"ujgurčina","uga":"ugaritčina","uk":"ukrajinčina","umb":"umbundu","und":"neznámy jazyk","ur":"urdčina","uz":"uzbečtina","vai":"vai","ve":"vendčina","vi":"vietnamčina","vo":"volapük","vot":"vodčina","vun":"vunjo","wa":"valónčina","wae":"walserčina","wak":"wakašský jazyk","wal":"walamo","war":"waray","was":"washo","wen":"lužickosrbský jazyk","wo":"wolof","xal":"kalmyčtina","xh":"xhosa","xog":"soga","yao":"jao","yap":"japčina","yav":"jangben","ybb":"yemba","yi":"jidiš","yo":"jorubčina","ypk":"juitsko-jupický jazyk","yue":"kantončina","za":"čuangčina","zap":"zapotéčtina","zbl":"systém Bliss","zen":"zenaga","zh":"čínština","zh-Hans":"zjednodušená čínština","zh-Hant":"tradičná čínština","znd":"zandský jazyk","zu":"zuluština","zun":"zuniština","zxx":"bez jazykového obsahu","zza":"zázá"};
+
+    rtl_data = {"af":false,"ar":true,"be":false,"bg":false,"bn":false,"ca":false,"cs":false,"cy":false,"da":false,"de":false,"el":false,"en":false,"en-GB":false,"es":false,"eu":false,"fa":true,"fi":false,"fil":false,"fr":false,"ga":false,"gl":false,"he":true,"hi":false,"hr":false,"hu":false,"id":false,"is":false,"it":false,"ja":false,"ko":false,"lv":false,"ms":false,"nb":false,"nl":false,"pl":false,"pt":false,"ro":false,"ru":false,"sk":false,"sq":false,"sr":false,"sv":false,"ta":false,"th":false,"tr":false,"uk":false,"ur":true,"vi":false,"zh":false,"zh-Hant":false};
+
+    Languages.from_code = function(code) {
+      return this.all[code] || null;
+    };
+
+    Languages.is_rtl = function(locale) {
+      var result;
+      result = rtl_data[locale];
+      if (result != null) {
+        return result;
+      } else {
+        return null;
+      }
+    };
+
+    return Languages;
 
   })();
 

@@ -24,6 +24,8 @@
 
   TwitterCldr.is_rtl = false;
 
+  TwitterCldr.locale = "nb";
+
   TwitterCldr.Utilities = (function() {
     function Utilities() {}
 
@@ -571,7 +573,7 @@
     DateTimeFormatter.prototype.timezone = function(time, pattern, length) {
       var hours, minutes, offset, offsetString, sign;
       offset = time.getTimezoneOffset();
-      hours = ("00" + (Math.abs(offset) / 60).toString()).slice(-2);
+      hours = ("00" + (Math.floor(Math.abs(offset) / 60)).toString()).slice(-2);
       minutes = ("00" + (Math.abs(offset) % 60).toString()).slice(-2);
       sign = offset > 0 ? "-" : "+";
       offsetString = sign + hours + ":" + minutes;
@@ -746,7 +748,7 @@
     }
 
     NumberFormatter.prototype.format = function(number, options) {
-      var fraction, fraction_format, integer_format, intg, key, opts, prefix, result, sign, suffix, val, _ref, _ref1;
+      var fraction, fraction_format, integer_format, intg, key, opts, prefix, result, sign, suffix, tokens, val, _ref, _ref1;
       if (options == null) {
         options = {};
       }
@@ -755,18 +757,23 @@
         val = options[key];
         opts[key] = options[key] != null ? options[key] : opts[key];
       }
-      _ref = this.partition_tokens(this.get_tokens(number, opts)), prefix = _ref[0], suffix = _ref[1], integer_format = _ref[2], fraction_format = _ref[3];
-      number = this.transform_number(number);
-      _ref1 = this.parse_number(number, opts), intg = _ref1[0], fraction = _ref1[1];
-      result = integer_format.apply(parseFloat(intg), opts);
-      if (fraction) {
-        result += fraction_format.apply(fraction, opts);
+      tokens = this.get_tokens(number, opts);
+      if (tokens.join('') === '0') {
+        return number.toString();
+      } else {
+        _ref = this.partition_tokens(tokens), prefix = _ref[0], suffix = _ref[1], integer_format = _ref[2], fraction_format = _ref[3];
+        number = this.truncate_number(number, integer_format);
+        _ref1 = this.parse_number(number, opts), intg = _ref1[0], fraction = _ref1[1];
+        result = integer_format.apply(parseFloat(intg), opts);
+        if (fraction) {
+          result += fraction_format.apply(fraction, opts);
+        }
+        sign = number < 0 && prefix !== "-" ? this.symbols.minus_sign || this.default_symbols.minus_sign : "";
+        return "" + prefix + result + suffix;
       }
-      sign = number < 0 && prefix !== "-" ? this.symbols.minus_sign || this.default_symbols.minus_sign : "";
-      return "" + prefix + result + suffix;
     };
 
-    NumberFormatter.prototype.transform_number = function(number) {
+    NumberFormatter.prototype.truncate_number = function(number, integer_format) {
       return number;
     };
 
@@ -1001,12 +1008,11 @@
       return tokens;
     };
 
-    AbbreviatedNumberFormatter.prototype.transform_number = function(number) {
-      var factor, power;
-      if ((number < this.NUMBER_MAX) && (number >= this.NUMBER_MIN)) {
-        power = Math.floor((number.toString().length - 1) / 3) * 3;
-        factor = Math.pow(10, power);
-        return number / factor;
+    AbbreviatedNumberFormatter.prototype.truncate_number = function(number, integer_format) {
+      var factor;
+      if (this.NUMBER_MIN <= number && number < this.NUMBER_MAX) {
+        factor = Math.max(0, Math.floor(number).toString().length - integer_format.format.length);
+        return number / Math.pow(10, factor);
       } else {
         return number;
       }
@@ -1813,20 +1819,93 @@
     };
 
     PhoneCodes.code_for_territory = function(territory) {
-      var phone_code, result, territory_code, _ref;
-      result = null;
-      _ref = this.phone_codes;
-      for (territory_code in _ref) {
-        phone_code = _ref[territory_code];
-        if (territory_code === territory) {
-          result = phone_code;
-          break;
-        }
+      var result;
+      result = this.phone_codes[territory];
+      if (result != null) {
+        return result;
+      } else {
+        return null;
       }
-      return result;
     };
 
     return PhoneCodes;
+
+  })();
+
+  TwitterCldr.PostalCodes = (function() {
+    var find_regex, postal_codes;
+
+    function PostalCodes() {}
+
+    postal_codes = {"ad":"AD\\d{3}","am":"(37)?\\d{4}","ar":"([A-HJ-NP-Z])?\\d{4}([A-Z]{3})?","as":"96799","at":"\\d{4}","au":"\\d{4}","ax":"22\\d{3}","az":"\\d{4}","ba":"\\d{5}","bb":"(BB\\d{5})?","bd":"\\d{4}","be":"\\d{4}","bg":"\\d{4}","bh":"((1[0-2]|[2-9])\\d{2})?","bm":"[A-Z]{2}[ ]?[A-Z0-9]{2}","bn":"[A-Z]{2}[ ]?\\d{4}","br":"\\d{5}[\\-]?\\d{3}","by":"\\d{6}","ca":"[ABCEGHJKLMNPRSTVXY]\\d[ABCEGHJ-NPRSTV-Z][ ]?\\d[ABCEGHJ-NPRSTV-Z]\\d","cc":"6799","ch":"\\d{4}","ck":"\\d{4}","cl":"\\d{7}","cn":"\\d{6}","cr":"\\d{4,5}|\\d{3}-\\d{4}","cs":"\\d{5}","cv":"\\d{4}","cx":"6798","cy":"\\d{4}","cz":"\\d{3}[ ]?\\d{2}","de":"\\d{5}","dk":"\\d{4}","do":"\\d{5}","dz":"\\d{5}","ec":"([A-Z]\\d{4}[A-Z]|(?:[A-Z]{2})?\\d{6})?","ee":"\\d{5}","eg":"\\d{5}","es":"\\d{5}","et":"\\d{4}","fi":"\\d{5}","fk":"FIQQ 1ZZ","fm":"(9694[1-4])([ \\-]\\d{4})?","fo":"\\d{3}","fr":"\\d{2}[ ]?\\d{3}","gb":"GIR[ ]?0AA|((AB|AL|B|BA|BB|BD|BH|BL|BN|BR|BS|BT|CA|CB|CF|CH|CM|CO|CR|CT|CV|CW|DA|DD|DE|DG|DH|DL|DN|DT|DY|E|EC|EH|EN|EX|FK|FY|G|GL|GY|GU|HA|HD|HG|HP|HR|HS|HU|HX|IG|IM|IP|IV|JE|KA|KT|KW|KY|L|LA|LD|LE|LL|LN|LS|LU|M|ME|MK|ML|N|NE|NG|NN|NP|NR|NW|OL|OX|PA|PE|PH|PL|PO|PR|RG|RH|RM|S|SA|SE|SG|SK|SL|SM|SN|SO|SP|SR|SS|ST|SW|SY|TA|TD|TF|TN|TQ|TR|TS|TW|UB|W|WA|WC|WD|WF|WN|WR|WS|WV|YO|ZE)(\\d[\\dA-Z]?[ ]?\\d[ABD-HJLN-UW-Z]{2}))|BFPO[ ]?\\d{1,4}","ge":"\\d{4}","gf":"9[78]3\\d{2}","gg":"GY\\d[\\dA-Z]?[ ]?\\d[ABD-HJLN-UW-Z]{2}","gl":"39\\d{2}","gn":"\\d{3}","gp":"9[78][01]\\d{2}","gr":"\\d{3}[ ]?\\d{2}","gs":"SIQQ 1ZZ","gt":"\\d{5}","gu":"969[123]\\d([ \\-]\\d{4})?","gw":"\\d{4}","hm":"\\d{4}","hn":"(?:\\d{5})?","hr":"\\d{5}","ht":"\\d{4}","hu":"\\d{4}","id":"\\d{5}","ie":"((D|DUBLIN)?([1-9]|6[wW]|1[0-8]|2[024]))?","il":"\\d{5}","im":"IM\\d[\\dA-Z]?[ ]?\\d[ABD-HJLN-UW-Z]{2}","in":"\\d{6}","io":"BBND 1ZZ","iq":"\\d{5}","is":"\\d{3}","it":"\\d{5}","je":"JE\\d[\\dA-Z]?[ ]?\\d[ABD-HJLN-UW-Z]{2}","jo":"\\d{5}","jp":"\\d{3}-\\d{4}","ke":"\\d{5}","kg":"\\d{6}","kh":"\\d{5}","kr":"\\d{3}[\\-]\\d{3}","kw":"\\d{5}","kz":"\\d{6}","la":"\\d{5}","lb":"(\\d{4}([ ]?\\d{4})?)?","li":"(948[5-9])|(949[0-7])","lk":"\\d{5}","lr":"\\d{4}","ls":"\\d{3}","lt":"\\d{5}","lu":"\\d{4}","lv":"\\d{4}","ma":"\\d{5}","mc":"980\\d{2}","md":"\\d{4}","me":"8\\d{4}","mg":"\\d{3}","mh":"969[67]\\d([ \\-]\\d{4})?","mk":"\\d{4}","mn":"\\d{6}","mp":"9695[012]([ \\-]\\d{4})?","mq":"9[78]2\\d{2}","mt":"[A-Z]{3}[ ]?\\d{2,4}","mu":"(\\d{3}[A-Z]{2}\\d{3})?","mv":"\\d{5}","mx":"\\d{5}","my":"\\d{5}","nc":"988\\d{2}","ne":"\\d{4}","nf":"2899","ng":"(\\d{6})?","ni":"((\\d{4}-)?\\d{3}-\\d{3}(-\\d{1})?)?","nl":"\\d{4}[ ]?[A-Z]{2}","no":"\\d{4}","np":"\\d{5}","nz":"\\d{4}","om":"(PC )?\\d{3}","pf":"987\\d{2}","pg":"\\d{3}","ph":"\\d{4}","pk":"\\d{5}","pl":"\\d{2}-\\d{3}","pm":"9[78]5\\d{2}","pn":"PCRN 1ZZ","pr":"00[679]\\d{2}([ \\-]\\d{4})?","pt":"\\d{4}([\\-]\\d{3})?","pw":"96940","py":"\\d{4}","re":"9[78]4\\d{2}","ro":"\\d{6}","rs":"\\d{6}","ru":"\\d{6}","sa":"\\d{5}","se":"\\d{3}[ ]?\\d{2}","sg":"\\d{6}","sh":"(ASCN|STHL) 1ZZ","si":"\\d{4}","sj":"\\d{4}","sk":"\\d{3}[ ]?\\d{2}","sm":"4789\\d","sn":"\\d{5}","so":"\\d{5}","sz":"[HLMS]\\d{3}","tc":"TKCA 1ZZ","th":"\\d{5}","tj":"\\d{6}","tm":"\\d{6}","tn":"\\d{4}","tr":"\\d{5}","tw":"\\d{3}(\\d{2})?","ua":"\\d{5}","us":"\\d{5}([ \\-]\\d{4})?","uy":"\\d{5}","uz":"\\d{6}","va":"00120","ve":"\\d{4}","vi":"008(([0-4]\\d)|(5[01]))([ \\-]\\d{4})?","wf":"986\\d{2}","yt":"976\\d{2}","yu":"\\d{5}","za":"\\d{4}","zm":"\\d{5}"};
+
+    find_regex = function(territory) {
+      var regex_str;
+      regex_str = postal_codes[territory];
+      if (regex_str != null) {
+        return regex_str;
+      } else {
+        return null;
+      }
+    };
+
+    PostalCodes.territories = function() {
+      var data, _;
+      return this.codes || (this.codes = (function() {
+        var _results;
+        _results = [];
+        for (data in postal_codes) {
+          _ = postal_codes[data];
+          _results.push(data);
+        }
+        return _results;
+      })());
+    };
+
+    PostalCodes.regex_for_territory = function(territory) {
+      var regex;
+      regex = find_regex(territory);
+      if (regex != null) {
+        return new RegExp(regex);
+      } else {
+        return null;
+      }
+    };
+
+    PostalCodes.is_valid = function(territory, postal_code) {
+      var regex;
+      regex = this.regex_for_territory(territory);
+      return regex.test(postal_code);
+    };
+
+    return PostalCodes;
+
+  })();
+
+  TwitterCldr.Languages = (function() {
+    var rtl_data;
+
+    function Languages() {}
+
+    Languages.all = {"aa":"afar","ab":"abkhasisk","ace":"achinesisk","ach":"acoli","ada":"adangme","ady":"adyghe","ae":"avestisk","af":"afrikaans","afa":"afroasiatisk språk","afh":"afrihili","agq":"aghem","ain":"ainu","ak":"akan","akk":"akkadisk","ale":"aleutisk","alg":"algonkinsk språk","alt":"søraltaisk","am":"amharisk","an":"aragonsk","ang":"gammelengelsk","anp":"angika","apa":"apachespråk","ar":"arabisk","ar-001":"Modern Standard Arabic","arc":"arameisk","arn":"araukansk","arp":"arapaho","art":"kunstig språk","arw":"arawak","as":"assamisk","asa":"asu","ast":"asturisk","ath":"athapaskansk språk","aus":"australsk språk","av":"avarisk","awa":"awadhi","ay":"aymara","az":"aserbajdsjansk","ba":"basjkirsk","bad":"banda","bai":"bamilekisk språk","bal":"baluchi","ban":"balinesisk","bas":"basa","bat":"baltisk språk","bax":"bamun","bbj":"ghomala","be":"hviterussisk","bej":"beja","bem":"bemba","ber":"berbisk","bez":"bena","bfd":"bafut","bg":"bulgarsk","bh":"bihari","bho":"bhojpuri","bi":"bislama","bik":"bikol","bin":"bini","bkm":"kom","bla":"siksika","bm":"bambara","bn":"bengali","bnt":"bantu","bo":"tibetansk","br":"bretonsk","bra":"braj","brx":"bodo","bs":"bosnisk","bss":"Akoose","btk":"batak","bua":"buriat","bug":"buginesisk","bum":"bulu","byn":"blin","byv":"medumba","ca":"katalansk","cad":"caddo","cai":"sentralamerikansk indiansk språk","car":"karibisk","cau":"kaukasisk språk","cay":"cayuga","cch":"atsam","ce":"tsjetsjensk","ceb":"cebuansk","cel":"keltisk språk","cgg":"kiga","ch":"chamorro","chb":"chibcha","chg":"chagatai","chk":"chuukesisk","chm":"mari","chn":"chinook","cho":"choctaw","chp":"chipewiansk","chr":"cherokee","chy":"cheyenne","ckb":"kurdisk (sorani)","cmc":"kamisk språk","co":"korsikansk","cop":"koptisk","cpe":"engelskbasert kreol- eller pidginspråk","cpf":"franskbasert kreol- eller pidginspråk","cpp":"portugisiskbasert kreol- eller pidginspråk","cr":"cree","crh":"krimtatarisk","crp":"kreol- eller pidginspråk","cs":"tsjekkisk","csb":"kasjubisk","cu":"kirkeslavisk","cus":"kusjitisk språk","cv":"tsjuvansk","cy":"walisisk","da":"dansk","dak":"dakota","dar":"dargwa","dav":"taita","day":"dayak","de":"tysk","de-AT":"østerriksk tysk","de-CH":"sveitsisk høytysk","del":"delaware","den":"slavisk","dgr":"dogrib","din":"dinka","dje":"zarma","doi":"dogri","dra":"dravidisk språk","dsb":"lavsorbisk","dua":"duala","dum":"mellomnederlandsk","dv":"divehi","dyo":"jola-fonyi","dyu":"dyula","dz":"dzongkha","dzg":"dazaga","ebu":"kiembu","ee":"ewe","efi":"efik","egy":"gammelegyptisk","eka":"ekajuk","el":"gresk","elx":"elamittisk","en":"engelsk","en-AU":"australsk engelsk","en-CA":"canadisk engelsk","en-GB":"britisk engelsk","en-US":"amerikansk engelsk","enm":"mellomengelsk","eo":"esperanto","es":"spansk","es-419":"latinamerikansk spansk","es-ES":"europeisk spansk","et":"estisk","eu":"baskisk","ewo":"ewondo","fa":"persisk","fan":"fang","fat":"fanti","ff":"fulani","fi":"finsk","fil":"filippinsk","fiu":"finsk-ugrisk språk","fj":"fijiansk","fo":"færøysk","fon":"fon","fr":"fransk","fr-CA":"canadisk fransk","fr-CH":"sveitsisk fransk","frm":"mellomfransk","fro":"gammelfransk","frr":"nordfrisisk","frs":"østfrisisk","fur":"friuliansk","fy":"vestfrisisk","ga":"irsk","gaa":"ga","gay":"gayo","gba":"gbaya","gd":"skotsk gælisk","gem":"germansk språk","gez":"ges","gil":"kiribatisk","gl":"galisisk","gmh":"mellomhøytysk","gn":"guarani","goh":"gammelhøytysk","gon":"gondi","gor":"gorontalo","got":"gotisk","grb":"grebo","grc":"gammelgresk","gsw":"sveitsertysk","gu":"gujarati","guz":"gusii","gv":"manx","gwi":"gwichin","ha":"hausa","hai":"haida","haw":"hawaiisk","he":"hebraisk","hi":"hindi","hil":"hiligaynon","him":"himachali","hit":"hettittisk","hmn":"hmong","ho":"hiri motu","hr":"kroatisk","hsb":"høysorbisk","ht":"haitisk","hu":"ungarsk","hup":"hupa","hy":"armensk","hz":"herero","ia":"interlingua","iba":"iban","ibb":"Ibibio","id":"indonesisk","ie":"interlingue","ig":"ibo","ii":"sichuan-yi","ijo":"ijo","ik":"inupiak","ilo":"iloko","inc":"indisk språk","ine":"indoeuropeisk språk","inh":"ingusjisk","io":"ido","ira":"iransk språk","iro":"irokansk språk","is":"islandsk","it":"italiensk","iu":"inuktitut","ja":"japansk","jbo":"lojban","jgo":"Ngomba","jmc":"machame","jpr":"jødepersisk","jrb":"jødearabisk","jv":"javanesisk","ka":"georgisk","kaa":"karakalpakisk","kab":"kabylsk","kac":"kachin","kaj":"jju","kam":"kamba","kar":"karensk","kaw":"kawi","kbd":"kabardisk","kbl":"kanembu","kcg":"tyap","kde":"makonde","kea":"kappverdisk","kfo":"koro","kg":"kikongo","kha":"khasi","khi":"khoisanspråk","kho":"khotanesisk","khq":"koyra chiini","ki":"kikuyu","kj":"kuanyama","kk":"kasakhisk","kkj":"Kako","kl":"grønlandsk","kln":"kalenjin","km":"khmer","kmb":"kimbundu","kn":"kannada","ko":"koreansk","kok":"konkani","kos":"kosraeansk","kpe":"kpelle","kr":"kanuri","krc":"karachay-balkar","krl":"karelsk","kro":"kru","kru":"kurukh","ks":"kasjmiri","ksb":"shambala","ksf":"bafia","ksh":"kølnsk","ku":"kurdisk","kum":"kumyk","kut":"kutenai","kv":"komi","kw":"kornisk","ky":"kirgisisk","la":"latin","lad":"ladinsk","lag":"langi","lah":"lahnda","lam":"lamba","lb":"luxemburgsk","lez":"lezghian","lg":"ganda","li":"limburgisk","lkt":"Lakota","ln":"lingala","lo":"laotisk","lol":"mongo","loz":"lozi","lt":"litauisk","lu":"luba-katanga","lua":"luba-lulua","lui":"luiseno","lun":"lunda","luo":"luo","lus":"lushai","luy":"oluluyia","lv":"latvisk","mad":"maduresisk","maf":"mafa","mag":"magahi","mai":"maithili","mak":"makasar","man":"mandingo","map":"austronesisk språk","mas":"masai","mde":"maba","mdf":"moksha","mdr":"mandar","men":"mende","mer":"meru","mfe":"mauritisk-kreolsk","mg":"madagassisk","mga":"mellomirsk","mgh":"makhuwa-meetto","mgo":"Meta'","mh":"marshallesisk","mi":"maori","mic":"micmac","min":"minangkabau","mis":"annet språk","mk":"makedonsk","mkh":"mon-khmerspråk","ml":"malayalam","mn":"mongolsk","mnc":"mandsju","mni":"manipuri","mno":"manobospråk","mo":"moldavisk","moh":"mohawk","mos":"mossi","mr":"marathi","ms":"malayisk","mt":"maltesisk","mua":"mundang","mul":"flere språk","mun":"mundaspråk","mus":"creek","mwl":"mirandesisk","mwr":"marwari","my":"burmesisk","mye":"myene","myn":"mayaspråk","myv":"erzya","na":"nauru","nah":"nahuatl","nai":"nordamerikansk indiansk språk","nap":"napolitansk","naq":"nama","nb":"norsk bokmål","nd":"nord-ndebele","nds":"lavtysk","ne":"nepalsk","new":"newari","ng":"ndonga","nia":"nias","nic":"niger-kordofiansk språk","niu":"niueansk","nl":"nederlandsk","nl-BE":"flamsk","nmg":"kwasio","nn":"norsk nynorsk","nnh":"ngiemboon","no":"norsk","nog":"nogai","non":"gammelnorsk","nqo":"nkå","nr":"sør-ndebele","nso":"nord-sotho","nub":"nubisk språk","nus":"nuer","nv":"navajo","nwc":"klassisk newari","ny":"nyanja","nym":"nyamwezi","nyn":"nyankole","nyo":"nyoro","nzi":"nzima","oc":"oksitansk","oj":"ojibwa","om":"oromo","or":"oriya","os":"ossetisk","osa":"osage","ota":"ottomansk tyrkisk","oto":"otomisk språk","pa":"panjabi","paa":"papuisk språk","pag":"pangasinan","pal":"pahlavi","pam":"pampanga","pap":"papiamento","pau":"palauisk","peo":"gammelpersisk","phi":"filippinsk språk","phn":"fønikisk","pi":"pali","pl":"polsk","pon":"ponapisk","pra":"prakritspråk","pro":"gammelprovençalsk","ps":"pushto","pt":"portugisisk","pt-BR":"brasiliansk portugisisk","pt-PT":"europeisk portugisisk","qu":"quechua","raj":"rajasthani","rap":"rapanui","rar":"rarotongansk","rm":"retoromansk","rn":"rundi","ro":"rumensk","roa":"romansk språk","rof":"rombo","rom":"romani","root":"rot","ru":"russisk","rup":"aromansk","rw":"kinjarwanda","rwk":"rwa","sa":"sanskrit","sad":"sandawe","sah":"jakutsk","sai":"søramerikansk indiansk språk","sal":"salishansk språk","sam":"samaritansk arameisk","saq":"samburu","sas":"sasak","sat":"santali","sba":"ngambay","sbp":"sangu","sc":"sardinsk","scn":"siciliansk","sco":"skotsk","sd":"sindhi","se":"nordsamisk","see":"seneca","seh":"sena","sel":"selkupisk","sem":"semittisk språk","ses":"koyraboro senni","sg":"sango","sga":"gammelirsk","sgn":"tegnspråk","sh":"serbokroatisk","shi":"tachelhit","shn":"shan","shu":"Tsjad-arabisk","si":"singalesisk","sid":"sidamo","sio":"siouxspråk","sit":"sino-tibetansk språk","sk":"slovakisk","sl":"slovensk","sla":"slavisk språk","sm":"samoansk","sma":"sørsamisk","smi":"samisk språk","smj":"lulesamisk","smn":"enaresamisk","sms":"skoltesamisk","sn":"shona","snk":"soninke","so":"somali","sog":"sogdisk","son":"songhai","sq":"albansk","sr":"serbisk","srn":"sranan tongo","srr":"serer","ss":"swati","ssa":"nilo-saharaspråk","ssy":"saho","st":"sør-sotho","su":"sundanesisk","suk":"sukuma","sus":"susu","sux":"sumerisk","sv":"svensk","sw":"swahili","swb":"komorisk","swc":"kongolesisk swahili","syc":"klassisk syrisk","syr":"syrisk","ta":"tamil","tai":"taispråk","te":"telugu","tem":"temne","teo":"teso","ter":"tereno","tet":"tetum","tg":"tadsjikisk","th":"thai","ti":"tigrinja","tig":"tigré","tiv":"tiv","tk":"turkmensk","tkl":"tokelau","tl":"tagalog","tlh":"klingon","tli":"tlingit","tmh":"tamasjek","tn":"setswana","to":"tongansk","tog":"nyasa-tongansk","tpi":"tok pisin","tr":"tyrkisk","trv":"taroko","ts":"tsonga","tsi":"tsimshian","tt":"tatarisk","tum":"tumbuka","tup":"tupispråk","tut":"altaisk språk","tvl":"tuvalu","tw":"twi","twq":"tasawaq","ty":"tahitisk","tyv":"tuvinisk","tzm":"sentralmarokkansk tamazight","udm":"udmurt","ug":"uigurisk","uga":"ugaritisk","uk":"ukrainsk","umb":"umbundu","und":"ukjent språk","ur":"urdu","uz":"usbekisk","vai":"vai","ve":"venda","vi":"vietnamesisk","vo":"volapyk","vot":"votisk","vun":"vunjo","wa":"vallonsk","wae":"Walser","wak":"wakasjansk språk","wal":"walamo","war":"waray","was":"washo","wen":"sorbisk språk","wo":"wolof","xal":"kalmyk","xh":"xhosa","xog":"soga","yao":"yao","yap":"yapesisk","yav":"yangben","ybb":"yemba","yi":"jiddisk","yo":"joruba","ypk":"jupisk språk","yue":"kantonesisk","za":"zhuang","zap":"zapotec","zbl":"blissymboler","zen":"zenaga","zh":"kinesisk","zh-Hans":"forenklet kinesisk","zh-Hant":"tradisjonell kinesisk","znd":"zande","zu":"zulu","zun":"zuni","zxx":"uten språklig innhold","zza":"zaza"};
+
+    rtl_data = {"af":false,"ar":true,"be":false,"bg":false,"bn":false,"ca":false,"cs":false,"cy":false,"da":false,"de":false,"el":false,"en":false,"en-GB":false,"es":false,"eu":false,"fa":true,"fi":false,"fil":false,"fr":false,"ga":false,"gl":false,"he":true,"hi":false,"hr":false,"hu":false,"id":false,"is":false,"it":false,"ja":false,"ko":false,"lv":false,"ms":false,"nb":false,"nl":false,"pl":false,"pt":false,"ro":false,"ru":false,"sk":false,"sq":false,"sr":false,"sv":false,"ta":false,"th":false,"tr":false,"uk":false,"ur":true,"vi":false,"zh":false,"zh-Hant":false};
+
+    Languages.from_code = function(code) {
+      return this.all[code] || null;
+    };
+
+    Languages.is_rtl = function(locale) {
+      var result;
+      result = rtl_data[locale];
+      if (result != null) {
+        return result;
+      } else {
+        return null;
+      }
+    };
+
+    return Languages;
 
   })();
 
