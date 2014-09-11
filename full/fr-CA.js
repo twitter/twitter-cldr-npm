@@ -3,7 +3,7 @@
 // Copyright 2012 Twitter, Inc
 // http://www.apache.org/licenses/LICENSE-2.0
 
-// TwitterCLDR (JavaScript) v2.3.0
+// TwitterCLDR (JavaScript) v2.3.1
 // Authors:     Cameron Dutro [@camertron]
                 Kirill Lashuk [@KL_7]
                 portions by Sven Fuchs [@svenfuchs]
@@ -916,7 +916,9 @@
             symbol: options.currency
           };
         }
-        options.precision || (options.precision = this.defaults_for_currency(options.currency).digits);
+        if (options.precision == null) {
+          options.precision = this.defaults_for_currency(options.currency).digits;
+        }
       } else {
         currency = {
           symbol: this.default_currency_symbol
