@@ -15,7 +15,7 @@ npm install twitter_cldr
 ```javascript
 var TwitterCldr = require('twitter_cldr').load('en');
 var formatter = new TwitterCldr.DateTimeFormatter();
-fmt.format(new Date(), {"type": "full"});
+formatter.format(new Date(), {"type": "full"});
 ```
 
 ### Usage
