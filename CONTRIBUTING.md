@@ -18,7 +18,7 @@ You'll need to set up your Ruby build environment first:
 3.  `git clone https://github.com/twitter/twitter-cldr-js`
 4.  `cd /path/to/twitter-cldr-js`
 5.  `bundle install`
-6.  `bundle exec rake twitter_cldr:js:compile OUTPUT_DIR=/path/to/twitter-cldr-npm`
+6.  `bundle exec rake twitter_cldr:js:compile OUTPUT_DIR=/path/to/twitter-cldr-npm/assets`
 
 ### License
 By contributing your code, you agree to license your contribution under the terms of the Apache License v2:
