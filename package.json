@@ -9,10 +9,10 @@
     "ICU"
   ],
   "contributors": [
-    {"name": "Cameron Dutro", "url": "http://twitter.com/camertron", "email": "cdutro@twitter.com"},
+    {"name": "Cameron Dutro", "url": "http://twitter.com/camertron", "email": "camertron@gmail.com"},
     {"name": "Kirill Lashuk", "url": "http://twitter.com/kl7"}
   ],
-  "author": "Cameron Dutro <cdutro@twitter.com> (http://twitter.com/camertron)",
+  "author": "Cameron Dutro <camertron@gmail.com> (http://twitter.com/camertron)",
   "repository": {
     "type": "git",
     "url": "git://github.com/twitter/twitter-cldr-npm.git"
@@ -22,7 +22,7 @@
     "url": "http://www.apache.org/licenses/LICENSE-2.0"
   }],
   "main": "twitter_cldr.js",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "dependencies": {},
   "devDependencies": {},
   "optionalDependencies": {},
