@@ -44,6 +44,6 @@ See [twitter-cldr-js](http://github.com/twitter/twitter-cldr-js) for test suite.
 
 ### License
 
-Copyright 2015 Twitter, Inc.
+Copyright 2019 Twitter, Inc.
 
 Licensed under the Apache License, Version 2.0: http://www.apache.org/licenses/LICENSE-2.0
