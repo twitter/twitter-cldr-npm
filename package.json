@@ -22,7 +22,7 @@
     "url": "http://www.apache.org/licenses/LICENSE-2.0"
   }],
   "main": "twitter_cldr.js",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "dependencies": {},
   "devDependencies": {},
   "optionalDependencies": {},
